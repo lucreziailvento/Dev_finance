@@ -1,0 +1,11 @@
+.DS_Store
+*.pyc
+__pycache__/
+node_modules/
+frontend/dist/
+backend/data/
+.DS_Store
+*.db
+*.db-journal
+*.db-wal
+*.db-shm

@@ -1,5 +1,6 @@
 import os
 import shutil
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -11,7 +12,12 @@ except ImportError:
     from backend.parser import esegui_etl_storico
     from backend.db import get_conn_and_cursor, commit_and_close, execute, init_db, insert_on_conflict
 
-app = FastAPI(title="DevFinance Engine")
+@asynccontextmanager
+async def lifespan(app):
+    init_db()
+    yield
+
+app = FastAPI(title="DevFinance Engine", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -44,8 +50,6 @@ MACRO_BY_MICRO = {
 
 def get_macro(micro):
     return MACRO_BY_MICRO.get(micro, "Spese Variabili")
-
-init_db()
 
 # ── Pydantic models ──
 

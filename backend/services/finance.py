@@ -35,7 +35,7 @@ def build_clean_monthly_series(rows):
             continue
         desc = r.get("description") or ""
         desc_lower = desc.lower()
-        amount = r.get("amount") or 0
+        amount = float(r.get("amount") or 0)
         macro = r.get("macro_category") or ""
         is_titoli = any(k in desc_lower for k in MOVIMENTI_TITOLI)
         is_trasferimento = macro in ("Trasferimento Interno", "Investimenti") or \

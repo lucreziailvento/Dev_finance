@@ -1,5 +1,6 @@
 import os
 import shutil
+import tempfile
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -30,7 +31,10 @@ app.add_middleware(
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
 FRONTEND_DIST = os.path.join(os.path.dirname(BASE_DIR), "frontend", "dist")
-os.makedirs(DATA_DIR, exist_ok=True)
+try:
+    os.makedirs(DATA_DIR, exist_ok=True)
+except OSError:
+    pass
 
 MACRO_BY_MICRO = {
     "Entrate_Lavoro": "Entrate",
@@ -89,8 +93,8 @@ class ManualRecord(BaseModel):
 @app.post("/api/ingest")
 async def ingest(fineco_file: UploadFile = File(...), revolut_file: UploadFile = File(...)):
     try:
-        path_f = os.path.join(DATA_DIR, "uploaded_fineco.xlsx")
-        path_r = os.path.join(DATA_DIR, "uploaded_revolut.csv")
+        path_f = os.path.join(tempfile.gettempdir(), "uploaded_fineco.xlsx")
+        path_r = os.path.join(tempfile.gettempdir(), "uploaded_revolut.csv")
         with open(path_f, "wb") as f:
             shutil.copyfileobj(fineco_file.file, f)
         with open(path_r, "wb") as f:

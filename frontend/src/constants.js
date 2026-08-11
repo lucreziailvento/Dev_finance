@@ -1,6 +1,7 @@
 export const CATEGORIES = [
-  "Spesa Alimentare", "Aperitivi", "Affitto & Condominio", "Utenze & Bollette",
+  "Spesa Alimentare", "Aperitivi", "Colazioni", "Affitto & Condominio", "Utenze & Bollette",
   "Svago & Ristorazione", "Sport & Salute", "Shopping & Lifestyle", "Regali", "Casa & Arredamento",
+  "Vacanza", "Weekend Fuori",
   "Abbonamenti Digitali", "Trasporti & Viaggi", "Investimenti & Risparmio",
   "Entrate_Lavoro", "Altre Entrate", "Giroconto", "Altro"
 ];
@@ -8,6 +9,7 @@ export const CATEGORIES = [
 export const CAT_COLORS = {
   "Spesa Alimentare": "#34d399",
   "Aperitivi": "#f87171",
+  "Colazioni": "#fde047",
   "Affitto & Condominio": "#a78bfa",
   "Utenze & Bollette": "#38bdf8",
   "Svago & Ristorazione": "#fbbf24",
@@ -15,6 +17,8 @@ export const CAT_COLORS = {
   "Shopping & Lifestyle": "#e879f9",
   "Regali": "#818cf8",
   "Casa & Arredamento": "#b45309",
+  "Vacanza": "#3b82f6",
+  "Weekend Fuori": "#d8b4fe",
   "Abbonamenti Digitali": "#22d3ee",
   "Trasporti & Viaggi": "#fb923c",
   "Investimenti & Risparmio": "#2dd4bf",

@@ -3,7 +3,7 @@ import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 # ── Normalizza sys.path: consente import assoluti `from backend.*`
 #    sia da Vercel (api/index.py) sia in esecuzione locale dalla root.
@@ -63,6 +63,8 @@ async def serve_frontend(full_path: str):
     file_path = os.path.join(FRONTEND_DIST, full_path)
     if os.path.isfile(file_path):
         return FileResponse(file_path)
+    if os.path.splitext(full_path)[1]:
+        return JSONResponse({"error": "not found"}, status_code=404)
     return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
 

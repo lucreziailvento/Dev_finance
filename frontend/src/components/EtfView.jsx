@@ -21,20 +21,24 @@ function projection(monthly, annualPct, years) {
 
 export default function EtfView() {
   const [plan, setPlan] = useState(null);
+  const [error, setError] = useState(null);
   const [months, setMonths] = useState(12);
   const [buffer, setBuffer] = useState(0.2);
   const [monthly, setMonthly] = useState(0);
   const [rate, setRate] = useState(5);
   const [years, setYears] = useState(10);
+  const [reload, setReload] = useState(0);
 
   useEffect(() => {
     api.etfPlan(months, buffer).then(j => {
       if (!j.error) {
         setPlan(j);
         setMonthly(j.recommended_monthly || 0);
+      } else {
+        setError(j.error);
       }
-    });
-  }, [months, buffer]);
+    }).catch(() => setError('Impossibile calcolare il piano. Riprova.'));
+  }, [months, buffer, reload]);
 
   const proj = useMemo(() => projection(monthly || 0, rate, years), [monthly, rate, years]);
 
@@ -42,6 +46,17 @@ export default function EtfView() {
     label: MONTH_LABELS[m.month] || m.month,
     investable: m.investable,
   })), [plan]);
+
+  if (error) {
+    return (
+      <div className="bg-rose-500/10 border border-rose-500/30 rounded-2xl p-6 text-center">
+        <p className="text-xs text-rose-300 font-semibold">{error}</p>
+        <button onClick={() => setReload(r => r + 1)} className="mt-3 text-[10px] text-rose-400 bg-rose-500/10 px-3 py-1.5 rounded-lg font-bold">
+          Riprova
+        </button>
+      </div>
+    );
+  }
 
   if (!plan) {
     return (

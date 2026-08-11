@@ -15,8 +15,9 @@ def build_clean_monthly_series(rows):
 
     Regole:
     - 'compravendita' in descrizione: esborsi -> invested, vendite -> ignorate
-    - 'assegno' / 'bonifico' / macro 'Trasferimento Interno': trasferimento
+    - 'assegno' o bonifico in uscita (negativo): trasferimento
     - macro 'Investimenti': esborsi -> invested, entrate -> ignorate
+    - macro 'Trasferimento Interno': trasferimento
     - il resto: entrate (amount > 0) o spese (amount < 0)
     """
     per_month = {}
@@ -30,7 +31,7 @@ def build_clean_monthly_series(rows):
 
         is_compravendita = "compravendita" in desc_lower
         is_assegno = "assegno" in desc_lower
-        is_bonifico = "bonifico" in desc_lower
+        is_bonifico_uscita = "bonifico" in desc_lower and amount < 0
         is_investimenti = macro == "Investimenti"
         is_trasferimento = macro == "Trasferimento Interno"
 
@@ -42,7 +43,7 @@ def build_clean_monthly_series(rows):
                 m["invested"] += abs(amount)
             else:
                 continue
-        elif is_assegno or is_bonifico or is_trasferimento:
+        elif is_assegno or is_bonifico_uscita or is_trasferimento:
             m["transfers"] += abs(amount)
         elif is_investimenti:
             if amount < 0:

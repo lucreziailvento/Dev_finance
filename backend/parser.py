@@ -17,12 +17,12 @@ CATEGORY_MAP = {
     "Weekend Fuori": [r"weekend", r"week end", r"gita", r"escursione", r"agriturismo", r"bed and breakfast", r"b&b", r"campeggio", r"bungalow"],
     "Abbonamenti Digitali": [r"spotify", r"netflix", r"aws", r"github", r"openai", r"apple\.com", r"icloud", r"prime video", r"youtube premium", r"abbonamento apple"],
     "Trasporti & Viaggi": [r"ryanair", r"trenitalia", r"italo", r"uber", r"enilive", r"tper", r"ridemovi", r"toremar", r"autostrade", r"booking", r"airbnb", r"skopje", r"las palmas"],
-    "Investimenti & Risparmio": [r"conto deposito", r"trade", r"scalable", r"etf", r"bg saxo", r"directa", r"btp", r"buono postale", r"conto di investimento"],
+    "Investimenti & Risparmio": [r"conto deposito", r"trade", r"scalable", r"etf", r"bg saxo", r"directa", r"btp", r"buono postale", r"conto di investimento", r"compravendita"],
     "Entrate_Lavoro": [r"stipendio", r"rimborso spese", r"tirocinio", r"lavoro chiamata", r"coop servizi", r"ritenuta", r"musixmatch", r"vivaevents"],
 }
 
 INTERNAL_TRANSFER_PATTERNS = [
-    r"revolut", r"ricarica di apple pay", r"top.?up", r"giroconto", r"pocket",
+    r"revolut", r"ricarica di apple pay", r"top.?up", r"giroconto", r"assegno", r"pocket",
     r"sposta denaro", r"pagamento da.*revolut", r"accredita.*regalo",
     r"pagamento visa debit", r"canone mensile", r"sconto canone",
 ]

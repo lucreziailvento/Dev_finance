@@ -4,11 +4,14 @@ import hashlib
 
 CATEGORY_MAP = {
     "Spesa Alimentare": [r"esselunga", r"coop", r"conad", r"lidl", r"carrefour", r"supermercati", r"aldi", r"pam", r"eataly", r"just eat"],
+    "Aperitivi": [r"aperitivo", r"spritz", r"cocktail", r"happy hour", r"negroni", r"prosecco bar", r"aperol"],
     "Affitto & Condominio": [r"affitto", r"condominio", r"canone", r"locazione"],
     "Utenze & Bollette": [r"enel", r"fastweb", r"iliad", r"iren", r"gruppo hera", r"vodafone", r"tari", r"servizio elettrico"],
     "Svago & Ristorazione": [r"bar", r"ristorante", r"pizzeria", r"pub", r"cinema", r"gallery16", r"piedra del sol", r"sorbetteria", r"venezia", r"amarilli", r"gelateria", r"osteria", r"pasticceria", r"briciole bar", r"roxy bar", r"bar il buco", r"teatro", r"tiger", r"tigot", r"circolo arci"],
     "Sport & Salute": [r"beach volley", r"palestra", r"decathlon", r"visita medica", r"farmacia", r"ticket", r"running"],
     "Shopping & Lifestyle": [r"subito", r"amazon", r"temu", r"ovs", r"dm drogerie", r"scout", r"zalando", r"shein", r"apple store", r"tedi"],
+    "Regali": [r"regalo", r"regali", r"compleanno", r"pandora", r"bomboniera", r"buono regalo", r"gift card"],
+    "Casa & Arredamento": [r"ikea", r"leroy merlin", r"bricocenter", r"bricoman", r"bricolage", r"obi", r"casalinghi", r"arredamento", r"mobili", r"tende", r"moquette", r"moka"],
     "Abbonamenti Digitali": [r"spotify", r"netflix", r"aws", r"github", r"openai", r"apple\.com", r"icloud", r"prime video", r"youtube premium", r"abbonamento apple"],
     "Trasporti & Viaggi": [r"ryanair", r"trenitalia", r"italo", r"uber", r"enilive", r"tper", r"ridemovi", r"toremar", r"autostrade", r"booking", r"airbnb", r"skopje", r"las palmas"],
     "Investimenti & Risparmio": [r"conto deposito", r"trade", r"scalable", r"etf", r"bg saxo", r"directa", r"btp", r"buono postale", r"conto di investimento"],
@@ -50,7 +53,7 @@ def categorizza(descrizione, importo):
                     return "Entrate", micro
                 elif micro == "Investimenti & Risparmio":
                     return "Investimenti", micro
-                elif micro in ["Svago & Ristorazione", "Shopping & Lifestyle", "Trasporti & Viaggi", "Sport & Salute"]:
+                elif micro in ["Svago & Ristorazione", "Shopping & Lifestyle", "Trasporti & Viaggi", "Sport & Salute", "Aperitivi", "Regali", "Casa & Arredamento"]:
                     return "Spese Variabili", micro
                 else:
                     return "Spese Fisse", micro

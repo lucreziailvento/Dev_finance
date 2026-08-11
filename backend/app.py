@@ -65,7 +65,7 @@ async def serve_frontend(full_path: str):
         return FileResponse(file_path)
     if os.path.splitext(full_path)[1]:
         return JSONResponse({"error": "not found"}, status_code=404)
-    return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+    return FileResponse(os.path.join(FRONTEND_DIST, "index.html"), headers={"Cache-Control": "no-store"})
 
 
 if __name__ == "__main__":

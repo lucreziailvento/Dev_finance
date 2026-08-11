@@ -38,6 +38,8 @@ export default function App() {
         allowsInlineMediaPlayback={true}
         mediaPlaybackRequiresUserAction={false}
         allowsBackForwardNavigationGestures={true}
+        cacheEnabled={false}
+        cacheMode="LOAD_NO_CACHE"
       />
       {loading && (
         <View style={styles.loading}>

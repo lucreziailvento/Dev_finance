@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { api } from '../api';
-import { MONTH_LABELS, COLORS } from '../constants';
+import { MONTH_LABELS, COLORS, CATEGORIES } from '../constants';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0);
 
@@ -17,7 +17,59 @@ function MetricCard({ label, value, icon, color, gradient }) {
   );
 }
 
-export default function DashboardView({ data, categories, transactions, catColor, onSelectCategory, selectedCategory, onOpenLedger }) {
+function InlineEdit({ value, onSave, className }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const ref = useRef(null);
+
+  useEffect(() => { if (editing && ref.current) ref.current.focus(); }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    if (draft !== value && draft.trim()) onSave(draft.trim());
+    else setDraft(value);
+  };
+
+  if (editing) {
+    return (
+      <input ref={ref} value={draft} onChange={e => setDraft(e.target.value)}
+        onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+        className={`bg-slate-800 border border-cyan-500 rounded-lg px-2 py-0.5 text-sm text-slate-100 focus:outline-none ${className}`} />
+    );
+  }
+  return (
+    <button onClick={() => { setDraft(value); setEditing(true); }} className={`text-left hover:bg-white/5 rounded-lg px-2 py-0.5 transition-colors ${className}`}>
+      {value}
+    </button>
+  );
+}
+
+function CategorySelect({ value, onChange, className }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className={`text-xs hover:bg-white/5 rounded-lg px-2 py-0.5 transition-colors ${className}`}>
+        {value}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-0 mb-1 z-20 bg-slate-800 border border-slate-600 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[200px] py-1">
+            {CATEGORIES.map(cat => (
+              <button key={cat} onClick={() => { onChange(cat); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${cat === value ? 'text-cyan-400 font-bold' : 'text-slate-300'}`}>
+                {cat}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+export default function DashboardView({ data, categories, transactions, catColor, onSelectCategory, selectedCategory, onOpenLedger, onUpdateDescription, onUpdateCategory }) {
   const [trend, setTrend] = useState([]);
 
   useEffect(() => {
@@ -38,6 +90,23 @@ export default function DashboardView({ data, categories, transactions, catColor
   }));
 
   const totalExpenses = categories.reduce((s, c) => s + c.amount, 0);
+
+  const renderTx = (t, i) => {
+    const isExpense = t.amount < 0;
+    const dotColor = isExpense ? COLORS.expenses : t.macro_category === 'Trasferimento Interno' ? COLORS.transfers : t.macro_category === 'Investimenti' ? COLORS.invested : COLORS.income;
+    return (
+      <div key={t.hash_id || i} className="flex items-center gap-3 py-2.5 px-1 rounded-xl hover:bg-white/5 transition-colors">
+        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
+        <div className="flex-1 min-w-0">
+          <InlineEdit value={t.description} onSave={v => onUpdateDescription(t, v)} className="text-sm text-slate-200 truncate block w-full" />
+          <CategorySelect value={t.micro_category} onChange={v => onUpdateCategory(t, v)} className="text-xs text-slate-500" />
+        </div>
+        <span className={`text-sm font-bold font-mono ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
+          {isExpense ? '−' : '+'}{fmt(Math.abs(t.amount))}
+        </span>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -125,22 +194,7 @@ export default function DashboardView({ data, categories, transactions, catColor
           <p className="text-slate-600 text-sm text-center py-6">Nessuna transazione</p>
         ) : (
           <div className="space-y-1">
-            {transactions.slice(0, 8).map((t, i) => {
-              const isExpense = t.amount < 0;
-              const dotColor = isExpense ? COLORS.expenses : t.macro_category === 'Trasferimento Interno' ? COLORS.transfers : t.macro_category === 'Investimenti' ? COLORS.invested : COLORS.income;
-              return (
-                <div key={t.hash_id || i} className="flex items-center gap-3 py-2.5 px-1 rounded-xl hover:bg-white/5 transition-colors">
-                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-slate-200 truncate">{t.description}</p>
-                    <p className="text-xs text-slate-500">{t.micro_category}</p>
-                  </div>
-                  <span className={`text-sm font-bold font-mono ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    {isExpense ? '−' : '+'}{fmt(Math.abs(t.amount))}
-                  </span>
-                </div>
-              );
-            })}
+            {transactions.slice(0, 8).map(renderTx)}
           </div>
         )}
       </div>

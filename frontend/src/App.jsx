@@ -1,5 +1,5 @@
-import { useState, useCallback, useRef } from 'react';
-import { MONTH_FULL, COLORS } from './constants';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { MONTH_FULL, COLORS, CATEGORIES } from './constants';
 import { useFinance } from './hooks/useFinance';
 
 import DashboardView from './components/DashboardView';
@@ -7,6 +7,58 @@ import StatsView from './components/StatsView';
 import BudgetView from './components/BudgetView';
 import EtfView from './components/EtfView';
 import Modal from './components/Modal';
+
+function InlineEdit({ value, onSave, className }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const ref = useRef(null);
+
+  useEffect(() => { if (editing && ref.current) ref.current.focus(); }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    if (draft !== value && draft.trim()) onSave(draft.trim());
+    else setDraft(value);
+  };
+
+  if (editing) {
+    return (
+      <input ref={ref} value={draft} onChange={e => setDraft(e.target.value)}
+        onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
+        className={`bg-slate-800 border border-cyan-500 rounded-lg px-2 py-0.5 text-sm text-slate-100 focus:outline-none ${className}`} />
+    );
+  }
+  return (
+    <button onClick={() => { setDraft(value); setEditing(true); }} className={`text-left hover:bg-white/5 rounded-lg px-2 py-0.5 transition-colors ${className}`}>
+      {value}
+    </button>
+  );
+}
+
+function CategorySelect({ value, onChange, className }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(!open)} className={`text-xs hover:bg-white/5 rounded-lg px-2 py-0.5 transition-colors ${className}`}>
+        {value}
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute bottom-full left-0 mb-1 z-20 bg-slate-800 border border-slate-600 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[200px] py-1">
+            {CATEGORIES.map(cat => (
+              <button key={cat} onClick={() => { onChange(cat); setOpen(false); }}
+                className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${cat === value ? 'text-cyan-400 font-bold' : 'text-slate-300'}`}>
+                {cat}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
@@ -170,6 +222,8 @@ export default function App() {
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
                 onOpenLedger={() => setShowLedger(true)}
+                onUpdateDescription={(tx, val) => { finance.updDesc(tx, val); finance.refresh(); }}
+                onUpdateCategory={(tx, val) => { finance.updCat(tx, val); finance.refresh(); }}
               />
             )}
             {tab === 'stats' && <StatsView />}
@@ -266,8 +320,8 @@ export default function App() {
               <div key={t.hash_id || i} className="flex items-center gap-3 py-2.5 px-1 rounded-xl hover:bg-white/5 transition-colors">
                 <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: isExpense ? COLORS.expenses : COLORS.income }} />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-slate-200 truncate">{t.description}</p>
-                  <p className="text-xs text-slate-500">{t.macro_category} · {t.account}</p>
+                  <InlineEdit value={t.description} onSave={v => { finance.updDesc(t, v); finance.refresh(); }} className="text-sm text-slate-200 truncate block w-full" />
+                  <CategorySelect value={t.micro_category} onChange={v => { finance.updCat(t, v); finance.refresh(); }} className="text-xs text-slate-500" />
                 </div>
                 <div className="text-right">
                   <p className={`text-sm font-bold font-mono ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>

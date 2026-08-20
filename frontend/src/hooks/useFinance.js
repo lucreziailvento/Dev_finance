@@ -97,6 +97,16 @@ export function useFinance(month) {
     fetchData(month);
   }, [month, fetchData]);
 
+  const updAmount = useCallback(async (tx, val) => {
+    if (tx.hash_id.startsWith('manual_')) {
+      await api.updateManual(tx.hash_id.replace('manual_', ''), {
+        date: tx.date, description: tx.description, amount: val,
+        micro_category: tx.micro_category, type: tx.amount > 0 ? 'entrata' : 'spesa',
+      });
+    }
+    fetchData(month);
+  }, [month, fetchData]);
+
   const delManual = useCallback(async (hashId) => {
     if (!hashId.startsWith('manual_')) return;
     await api.deleteManual(hashId.replace('manual_', ''));
@@ -117,7 +127,7 @@ export function useFinance(month) {
   return {
     data, forecast, budgetAverages, budgetAllocations, loading,
     refresh, fetchData, fetchForecast, fetchBudgetAverages, fetchBudgetAllocations,
-    saveAllocations, ingest, addManual, updDesc, updCat, delManual,
+    saveAllocations, ingest, addManual, updDesc, updCat, updAmount, delManual,
     saveForecast, deleteForecast,
   };
 }

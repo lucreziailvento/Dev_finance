@@ -44,6 +44,40 @@ function InlineEdit({ value, onSave, className }) {
   );
 }
 
+function InlineAmount({ amount, isManual, onSave, className }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(Math.abs(amount)));
+  const ref = useRef(null);
+
+  useEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.select(); } }, [editing]);
+
+  const commit = () => {
+    setEditing(false);
+    const val = parseFloat(draft);
+    if (!isNaN(val) && val > 0 && val !== Math.abs(amount)) onSave(val);
+    else setDraft(String(Math.abs(amount)));
+  };
+
+  if (!isManual) {
+    return <span className={`font-mono ${className}`}>{fmt(amount)}</span>;
+  }
+
+  if (editing) {
+    return (
+      <input ref={ref} type="number" step="0.01" value={draft} onChange={e => setDraft(e.target.value)}
+        onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(Math.abs(amount))); setEditing(false); } }}
+        className={`w-24 bg-slate-800 border border-cyan-500 rounded-lg px-2 py-0.5 text-sm text-right font-mono text-slate-100 focus:outline-none ${className}`} />
+    );
+  }
+
+  return (
+    <button onClick={() => { setDraft(String(Math.abs(amount))); setEditing(true); }}
+      className={`font-mono hover:bg-white/5 rounded-lg px-1 transition-colors cursor-pointer ${className}`}>
+      {fmt(amount)}
+    </button>
+  );
+}
+
 function CategorySelect({ value, onChange, className }) {
   const [open, setOpen] = useState(false);
 
@@ -69,7 +103,7 @@ function CategorySelect({ value, onChange, className }) {
   );
 }
 
-export default function DashboardView({ data, categories, transactions, catColor, onSelectCategory, selectedCategory, onOpenLedger, onUpdateDescription, onUpdateCategory }) {
+export default function DashboardView({ data, categories, transactions, catColor, onSelectCategory, selectedCategory, onOpenLedger, onUpdateDescription, onUpdateCategory, onUpdateAmount }) {
   const [trend, setTrend] = useState([]);
 
   useEffect(() => {
@@ -101,9 +135,8 @@ export default function DashboardView({ data, categories, transactions, catColor
           <InlineEdit value={t.description} onSave={v => onUpdateDescription(t, v)} className="text-sm text-slate-200 truncate block w-full" />
           <CategorySelect value={t.micro_category} onChange={v => onUpdateCategory(t, v)} className="text-xs text-slate-500" />
         </div>
-        <span className={`text-sm font-bold font-mono ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
-          {isExpense ? '−' : '+'}{fmt(Math.abs(t.amount))}
-        </span>
+        <InlineAmount amount={t.amount} isManual={t.hash_id?.startsWith('manual_')} onSave={v => onUpdateAmount(t, v)}
+          className={`text-sm font-bold ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`} />
       </div>
     );
   };

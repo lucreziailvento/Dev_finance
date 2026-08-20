@@ -60,6 +60,42 @@ function CategorySelect({ value, onChange, className }) {
   );
 }
 
+function InlineAmount({ amount, isManual, onSave, className }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(String(Math.abs(amount)));
+  const ref = useRef(null);
+
+  useEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.select(); } }, [editing]);
+
+  const fmtAmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0);
+
+  const commit = () => {
+    setEditing(false);
+    const val = parseFloat(draft);
+    if (!isNaN(val) && val > 0 && val !== Math.abs(amount)) onSave(val);
+    else setDraft(String(Math.abs(amount)));
+  };
+
+  if (!isManual) {
+    return <span className={`font-mono ${className}`}>{fmtAmt(amount)}</span>;
+  }
+
+  if (editing) {
+    return (
+      <input ref={ref} type="number" step="0.01" value={draft} onChange={e => setDraft(e.target.value)}
+        onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(Math.abs(amount))); setEditing(false); } }}
+        className={`w-24 bg-slate-800 border border-cyan-500 rounded-lg px-2 py-0.5 text-sm text-right font-mono text-slate-100 focus:outline-none ${className}`} />
+    );
+  }
+
+  return (
+    <button onClick={() => { setDraft(String(Math.abs(amount))); setEditing(true); }}
+      className={`font-mono hover:bg-white/5 rounded-lg px-1 transition-colors cursor-pointer ${className}`}>
+      {fmtAmt(amount)}
+    </button>
+  );
+}
+
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
   { id: 'stats', label: 'Analisi', icon: '📈' },
@@ -224,6 +260,7 @@ export default function App() {
                 onOpenLedger={() => setShowLedger(true)}
                 onUpdateDescription={(tx, val) => { finance.updDesc(tx, val); finance.refresh(); }}
                 onUpdateCategory={(tx, val) => { finance.updCat(tx, val); finance.refresh(); }}
+                onUpdateAmount={(tx, val) => { finance.updAmount(tx, val); finance.refresh(); }}
               />
             )}
             {tab === 'stats' && <StatsView />}
@@ -294,12 +331,14 @@ export default function App() {
                 <option value="entrata">Entrata</option>
               </select>
             </div>
-            <div>
-              <label className="text-xs text-slate-400 block mb-1">Sottocategoria</label>
-              <input type="text" value={manualForm.micro_category} onChange={e => setManualForm(f => ({ ...f, micro_category: e.target.value }))}
-                placeholder="opzionale"
-                className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors" />
-            </div>
+          <div>
+            <label className="text-xs text-slate-400 block mb-1">Sottocategoria</label>
+            <select value={manualForm.micro_category} onChange={e => setManualForm(f => ({ ...f, micro_category: e.target.value }))}
+              className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors">
+              <option value="">— seleziona —</option>
+              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
           </div>
           <div>
             <label className="text-xs text-slate-400 block mb-1">Data</label>
@@ -324,9 +363,8 @@ export default function App() {
                   <CategorySelect value={t.micro_category} onChange={v => { finance.updCat(t, v); finance.refresh(); }} className="text-xs text-slate-500" />
                 </div>
                 <div className="text-right">
-                  <p className={`text-sm font-bold font-mono ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}>
-                    {isExpense ? '−' : '+'}{new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Math.abs(t.amount))}
-                  </p>
+                  <InlineAmount amount={t.amount} isManual={t.hash_id?.startsWith('manual_')} onSave={v => { finance.updAmount(t, v); finance.refresh(); }}
+                    className={`text-sm font-bold ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`} />
                   <p className="text-[11px] text-slate-600">{t.date}</p>
                 </div>
               </div>

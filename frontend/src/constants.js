@@ -8,17 +8,17 @@ export const CATEGORIES = [
 
 export const CAT_COLORS = {
   "Spesa Alimentare": "#34d399",
-  "Aperitivi": "#f87171",
-  "Colazioni": "#fde047",
+  "Aperitivi": "#fb7185",
+  "Colazioni": "#facc15",
   "Affitto & Condominio": "#a78bfa",
   "Utenze & Bollette": "#38bdf8",
-  "Svago & Ristorazione": "#fbbf24",
-  "Sport & Salute": "#fb7185",
+  "Svago & Ristorazione": "#f59e0b",
+  "Sport & Salute": "#f472b6",
   "Shopping & Lifestyle": "#e879f9",
   "Regali": "#818cf8",
-  "Casa & Arredamento": "#b45309",
+  "Casa & Arredamento": "#f97316",
   "Vacanza": "#3b82f6",
-  "Weekend Fuori": "#d8b4fe",
+  "Weekend Fuori": "#c084fc",
   "Abbonamenti Digitali": "#22d3ee",
   "Trasporti & Viaggi": "#fb923c",
   "Investimenti & Risparmio": "#2dd4bf",
@@ -32,19 +32,31 @@ export function catColor(name) {
   return CAT_COLORS[name] || "#64748b";
 }
 
-export const MONTHS = [
-  "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06",
-  "2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12",
-];
+const MONTH_IT = ["Gen", "Feb", "Mar", "Apr", "Mag", "Giu", "Lug", "Ago", "Set", "Ott", "Nov", "Dic"];
+const MONTH_FULL_IT = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
 
-export const MONTH_LABELS = {
-  "2026-01": "Gen", "2026-02": "Feb", "2026-03": "Mar", "2026-04": "Apr",
-  "2026-05": "Mag", "2026-06": "Giu", "2026-07": "Lug", "2026-08": "Ago",
-  "2026-09": "Set", "2026-10": "Ott", "2026-11": "Nov", "2026-12": "Dic",
-};
+export const MONTH_LABELS = {};
+export const MONTH_FULL = {};
 
-export const MONTH_FULL = {
-  "2026-01": "Gennaio", "2026-02": "Febbraio", "2026-03": "Marzo", "2026-04": "Aprile",
-  "2026-05": "Maggio", "2026-06": "Giugno", "2026-07": "Luglio", "2026-08": "Agosto",
-  "2026-09": "Settembre", "2026-10": "Ottobre", "2026-11": "Novembre", "2026-12": "Dicembre",
+for (let y = 2024; y <= 2027; y++) {
+  for (let m = 1; m <= 12; m++) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    MONTH_LABELS[key] = MONTH_IT[m - 1];
+    MONTH_FULL[key] = `${MONTH_FULL_IT[m - 1]} ${y}`;
+  }
+}
+
+export const MONTHS = Object.keys(MONTH_LABELS).sort();
+
+export const COLORS = {
+  income: '#10b981',
+  expenses: '#f43f5e',
+  savings: '#06b6d4',
+  invested: '#8b5cf6',
+  investable: '#14b8a6',
+  transfers: '#64748b',
+  accent: '#06b6d4',
+  bg: '#0a0f1e',
+  card: '#111827',
+  cardLight: '#1f2937',
 };

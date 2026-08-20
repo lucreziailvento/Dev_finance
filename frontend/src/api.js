@@ -9,6 +9,8 @@ async function jfetch(path, options) {
 
 export const api = {
   dashboard: (month) => jfetch(`/api/dashboard/${month}`),
+  trend: (months = 12) => jfetch(`/api/trend?months=${months}`),
+  stats: () => jfetch('/api/stats'),
 
   forecast: (month) => jfetch(`/api/forecast/${month}`),
   saveForecast: (entry) => jfetch('/api/forecast', {
@@ -35,7 +37,6 @@ export const api = {
   addManual: (payload) => jfetch('/api/manual-records', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),
-  listManual: () => jfetch('/api/manual-records'),
   updateManual: (id, payload) => jfetch(`/api/manual-records/${id}`, {
     method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
   }),

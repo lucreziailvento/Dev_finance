@@ -61,7 +61,7 @@ export default function App() {
     }
   };
 
-  const [manualForm, setManualForm] = useState({ amount: '', description: '', macro_category: 'Uscite fisse', micro_category: '', account: 'Fineco', date: '' });
+  const [manualForm, setManualForm] = useState({ amount: '', description: '', micro_category: '', type: 'spesa', date: '' });
 
   const handleManualSubmit = async (e) => {
     e.preventDefault();
@@ -72,16 +72,15 @@ export default function App() {
         body: JSON.stringify({
           amount: parseFloat(manualForm.amount),
           description: manualForm.description,
-          macro_category: manualForm.macro_category,
           micro_category: manualForm.micro_category || manualForm.description,
-          account: manualForm.account,
+          type: manualForm.type,
           date: manualForm.date || new Date().toISOString().slice(0, 10),
         }),
       });
       if (res.ok) {
         finance.refresh();
         setShowManual(false);
-        setManualForm({ amount: '', description: '', macro_category: 'Uscite fisse', micro_category: '', account: 'Fineco', date: '' });
+        setManualForm({ amount: '', description: '', micro_category: '', type: 'spesa', date: '' });
         showToast('Transazione aggiunta');
       }
     } catch {
@@ -234,22 +233,18 @@ export default function App() {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Categoria</label>
-              <select value={manualForm.macro_category} onChange={e => setManualForm(f => ({ ...f, macro_category: e.target.value }))}
+              <label className="text-xs text-slate-400 block mb-1">Tipo</label>
+              <select value={manualForm.type} onChange={e => setManualForm(f => ({ ...f, type: e.target.value }))}
                 className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors">
-                <option>Uscite fisse</option>
-                <option>Uscite variabili</option>
-                <option>Investimenti & Risparmio</option>
-                <option>Trasferimento Interno</option>
+                <option value="spesa">Spesa</option>
+                <option value="entrata">Entrata</option>
               </select>
             </div>
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Conto</label>
-              <select value={manualForm.account} onChange={e => setManualForm(f => ({ ...f, account: e.target.value }))}
-                className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors">
-                <option>Fineco</option>
-                <option>Revolut</option>
-              </select>
+              <label className="text-xs text-slate-400 block mb-1">Sottocategoria</label>
+              <input type="text" value={manualForm.micro_category} onChange={e => setManualForm(f => ({ ...f, micro_category: e.target.value }))}
+                placeholder="opzionale"
+                className="w-full bg-slate-800 border border-slate-600 rounded-xl px-4 py-3 text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors" />
             </div>
           </div>
           <div>

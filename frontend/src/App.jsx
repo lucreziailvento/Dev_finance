@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { api } from './api';
 import { CATEGORIES, monthFull } from './constants';
 import { useFinance } from './hooks/useFinance';
 
@@ -6,11 +7,14 @@ import DashboardView from './components/DashboardView';
 import StatsView from './components/StatsView';
 import BudgetView from './components/BudgetView';
 import EtfView from './components/EtfView';
+import PlanView from './components/plan/PlanView';
+import SettingsModal from './components/SettingsModal';
 import Modal from './components/Modal';
 import TransactionRow from './components/TransactionRow';
 
 const TABS = [
   { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+  { id: 'plan', label: 'Piano', icon: '🗓️' },
   { id: 'stats', label: 'Analisi', icon: '📈' },
   { id: 'budget', label: 'Budget', icon: '🎯' },
   { id: 'etf', label: 'Investimenti', icon: '💰' },
@@ -34,7 +38,13 @@ export default function App() {
   const [showManual, setShowManual] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [showLedger, setShowLedger] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [manualForm, setManualForm] = useState(EMPTY_MANUAL_FORM);
+  const [ledgerSearch, setLedgerSearch] = useState('');
+  const [ledgerType, setLedgerType] = useState('all');
+  const [ledgerLimit, setLedgerLimit] = useState(50);
+  const [ledgerRows, setLedgerRows] = useState(null);
+  const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState(null);
 
   const finance = useFinance(month);
@@ -99,6 +109,49 @@ export default function App() {
     showToast(`Budget ${categoryName} aggiornato`);
   };
 
+  const handleGeneratePlan = async () => {
+    setGenerating(true);
+    const result = await finance.generatePlan();
+    setGenerating(false);
+    if (!result.ok) {
+      showToast(result.error || 'Errore generazione piano', 'error');
+      return;
+    }
+    showToast(
+      result.days_skipped_manual > 0
+        ? `Piano generato: ${result.days_written} giorni, ${result.days_skipped_manual} righe manuali intatte`
+        : `Piano generato: ${result.days_written} giorni`,
+    );
+  };
+
+  const openLedger = async () => {
+    setShowLedger(true);
+    try {
+      const result = await api.transactions({ limit: 5000 });
+      setLedgerRows(result.transactions || []);
+    } catch (exc) {
+      showToast(exc.message, 'error');
+      setLedgerRows(transactions);
+    }
+  };
+
+  const handleMakeRule = async (tx) => {    try {
+      const result = await api.ruleFromTransaction({
+        hash_id: tx.hash_id,
+        micro_category: tx.micro_category,
+        apply_existing: true,
+      });
+      showToast(
+        result.updated_transactions > 0
+          ? `Regola «${result.pattern}» salvata: ${result.updated_transactions} transazioni aggiornate`
+          : `Regola «${result.pattern}» salvata`,
+      );
+      await finance.refresh(month);
+    } catch (exc) {
+      showToast(exc.message, 'error');
+    }
+  };
+
   const shiftMonth = (delta) => {
     const [year, monthNumber] = month.split('-').map(Number);
     const date = new Date(year, monthNumber - 1 + delta, 1);
@@ -117,6 +170,23 @@ export default function App() {
   const filteredTransactions = selectedCategory
     ? transactions.filter((t) => t.macro_category === selectedCategory)
     : transactions;
+
+  // Nel registro unisco le righe fresche del mese visualizzato (così le
+  // modifiche si vedono subito) con lo storico caricato all'apertura.
+  const freshIds = new Set(transactions.map((tx) => tx.hash_id));
+  const ledgerSource = (ledgerRows
+    ? [...transactions, ...ledgerRows.filter((tx) => !freshIds.has(tx.hash_id))]
+    : transactions
+  ).slice().sort((a, b) => String(b.date).localeCompare(String(a.date)));
+  const ledgerQuery = ledgerSearch.trim().toLowerCase();
+  const ledgerTransactions = ledgerSource.filter((tx) => {
+    if (ledgerType === 'expense' && tx.amount >= 0) return false;
+    if (ledgerType === 'income' && tx.amount <= 0) return false;
+    if (!ledgerQuery) return true;
+    return (tx.description || '').toLowerCase().includes(ledgerQuery)
+      || (tx.micro_category || '').toLowerCase().includes(ledgerQuery)
+      || (tx.macro_category || '').toLowerCase().includes(ledgerQuery);
+  });
 
   return (
     <div className="min-h-screen bg-[#0a0f1e] text-slate-100 pb-24">
@@ -140,6 +210,9 @@ export default function App() {
               </button>
               <button onClick={() => setShowManual(true)} className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-lg transition-all" title="Aggiungi">
                 ✚
+              </button>
+              <button onClick={() => setShowSettings(true)} className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-lg transition-all" title="Impostazioni">
+                ⚙️
               </button>
             </div>
           </div>
@@ -174,6 +247,26 @@ export default function App() {
               </div>
             )}
 
+            {!finance.loading
+              && finance.meta?.latest_month
+              && month > finance.meta.latest_month
+              && transactions.length === 0 && (
+                <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3">
+                  <p className="text-xs font-bold text-slate-200">
+                    Nessun movimento a {monthFull(month)}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    L'ultimo dato disponibile è {finance.meta.last_date}.
+                  </p>
+                  <button
+                    onClick={() => setMonth(finance.meta.latest_month)}
+                    className="mt-2 text-[11px] font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
+                  >
+                    Vai a {monthFull(finance.meta.latest_month)} →
+                  </button>
+                </div>
+              )}
+
             {tab === 'dashboard' && (
               <DashboardView
                 data={finance.data}
@@ -182,10 +275,22 @@ export default function App() {
                 catColor={catColor}
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
-                onOpenLedger={() => setShowLedger(true)}
+                onOpenLedger={openLedger}
                 onUpdateDescription={finance.updDesc}
                 onUpdateCategory={finance.updCat}
                 onUpdateAmount={finance.updAmount}
+              />
+            )}
+            {tab === 'plan' && (
+              <PlanView
+                plan={finance.plan}
+                projection={finance.projection}
+                month={month}
+                onGenerate={handleGeneratePlan}
+                onSaveForecast={finance.saveForecast}
+                onDeleteForecast={finance.deleteForecast}
+                onLoadProjection={finance.loadProjection}
+                generating={generating}
               />
             )}
             {tab === 'stats' && <StatsView />}
@@ -278,24 +383,75 @@ export default function App() {
         </form>
       </Modal>
 
-      <Modal open={showLedger} onClose={() => setShowLedger(false)} title="Tutte le transazioni">
-        <div className="space-y-1 max-h-[60vh] overflow-y-auto">
-          {filteredTransactions.length === 0 ? (
+      <Modal open={showLedger} onClose={() => setShowLedger(false)} title="Transazioni">
+        <div className="space-y-3">
+          <input
+            type="search"
+            value={ledgerSearch}
+            onChange={(event) => { setLedgerSearch(event.target.value); setLedgerLimit(50); }}
+            placeholder="Cerca descrizione o categoria..."
+            className="w-full bg-slate-800 border border-slate-600 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-cyan-500"
+          />
+
+          <div className="flex gap-1.5">
+            {[
+              { id: 'all', label: 'Tutte' },
+              { id: 'expense', label: 'Spese' },
+              { id: 'income', label: 'Entrate' },
+            ].map((option) => (
+              <button
+                key={option.id}
+                onClick={() => { setLedgerType(option.id); setLedgerLimit(50); }}
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold transition-colors ${
+                  ledgerType === option.id
+                    ? 'bg-cyan-500 text-slate-950'
+                    : 'bg-white/5 text-slate-400 hover:bg-white/10'
+                }`}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            {ledgerTransactions.length} transazioni
+            {ledgerRows ? ' · tutto lo storico' : ''}
+          </p>
+
+          {ledgerTransactions.length === 0 ? (
             <p className="text-slate-600 text-sm text-center py-6">Nessuna transazione</p>
           ) : (
-            filteredTransactions.map((tx, index) => (
-              <TransactionRow
-                key={tx.hash_id || index}
-                tx={tx}
-                showDate
-                onUpdateDescription={finance.updDesc}
-                onUpdateCategory={finance.updCat}
-                onUpdateAmount={finance.updAmount}
-              />
-            ))
+            <div className="space-y-1 max-h-[55vh] overflow-y-auto">
+              {ledgerTransactions.slice(0, ledgerLimit).map((tx, index) => (
+                <TransactionRow
+                  key={tx.hash_id || index}
+                  tx={tx}
+                  showDate
+                  onUpdateDescription={finance.updDesc}
+                  onUpdateCategory={finance.updCat}
+                  onUpdateAmount={finance.updAmount}
+                  onMakeRule={handleMakeRule}
+                />
+              ))}
+            </div>
+          )}
+
+          {ledgerTransactions.length > ledgerLimit && (
+            <button
+              onClick={() => setLedgerLimit((value) => value + 50)}
+              className="w-full py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold text-slate-300 transition-colors"
+            >
+              Carica altre 50
+            </button>
           )}
         </div>
       </Modal>
+
+      <SettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        showToast={showToast}
+      />
     </div>
   );
 }

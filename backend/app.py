@@ -12,7 +12,20 @@ if REPO_ROOT not in sys.path:
     sys.path.insert(0, REPO_ROOT)
 
 from backend.db import init_db
-from backend.routers import ingest, manual_records, forecast, budget, transactions, dashboard, etf, stats
+from backend.routers import (
+    ingest,
+    manual_records,
+    forecast,
+    budget,
+    transactions,
+    dashboard,
+    etf,
+    stats,
+    plan,
+    rules,
+    export,
+    meta,
+)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE_DIR, "data")
@@ -48,6 +61,10 @@ app.include_router(transactions.router)
 app.include_router(dashboard.router)
 app.include_router(etf.router)
 app.include_router(stats.router)
+app.include_router(plan.router)
+app.include_router(rules.router)
+app.include_router(export.router)
+app.include_router(meta.router)
 
 
 @app.get("/api/health")

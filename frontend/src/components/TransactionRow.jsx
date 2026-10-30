@@ -14,6 +14,7 @@ export default function TransactionRow({
   onUpdateDescription,
   onUpdateCategory,
   onUpdateAmount,
+  onMakeRule = null,
   showDate = false,
 }) {
   const isExpense = tx.amount < 0;
@@ -46,6 +47,16 @@ export default function TransactionRow({
         />
         {showDate && <p className="text-[11px] text-slate-600">{tx.date}</p>}
       </div>
+      {onMakeRule && !isManual && (
+        <button
+          type="button"
+          onClick={() => onMakeRule(tx)}
+          title="Crea regola da questa transazione"
+          className="w-7 h-7 flex-shrink-0 rounded-lg bg-white/5 hover:bg-cyan-500/20 text-xs text-slate-400 hover:text-cyan-300 transition-colors"
+        >
+          🔁
+        </button>
+      )}
     </div>
   );
 }

@@ -20,6 +20,9 @@ export function useFinance(month) {
   const [forecast, setForecast] = useState({ forecasts: [], actuals: {} });
   const [budgetAverages, setBudgetAverages] = useState(null);
   const [budgetAllocations, setBudgetAllocations] = useState({});
+  const [plan, setPlan] = useState(null);
+  const [projection, setProjection] = useState(null);
+  const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -35,14 +38,20 @@ export function useFinance(month) {
       api.forecast(targetMonth),
       api.budgetAverages(),
       api.budgetAllocations(targetMonth),
+      api.plan(targetMonth),
+      api.projection(6, 0),
+      api.meta(),
     ]);
     if (id !== requestId.current) return;
 
-    const [dashboard, forecastResult, averages, allocations] = results;
+    const [dashboard, forecastResult, averages, allocations, planResult, projectionResult, metaResult] = results;
     if (dashboard.status === 'fulfilled') setData(dashboard.value);
     if (forecastResult.status === 'fulfilled') setForecast(forecastResult.value);
     if (averages.status === 'fulfilled') setBudgetAverages(averages.value);
     if (allocations.status === 'fulfilled') setBudgetAllocations(allocations.value);
+    if (planResult.status === 'fulfilled') setPlan(planResult.value);
+    if (projectionResult.status === 'fulfilled') setProjection(projectionResult.value);
+    if (metaResult.status === 'fulfilled') setMeta(metaResult.value);
 
     const failed = results.find((result) => result.status === 'rejected');
     setError(failed ? failed.reason?.message || 'Errore di caricamento' : null);
@@ -156,11 +165,38 @@ export function useFinance(month) {
     [month, mutate, refresh],
   );
 
+  const loadProjection = useCallback(async (buffer = 0) => {
+    try {
+      const value = await api.projection(6, buffer);
+      setProjection(value);
+      return value;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const generatePlan = useCallback(async () => {
+    setLoading(true);
+    try {
+      const result = await api.generatePlan(month);
+      await refresh(month);
+      return { ok: true, ...result };
+    } catch (exc) {
+      setError(exc.message);
+      return { ok: false, error: exc.message };
+    } finally {
+      setLoading(false);
+    }
+  }, [month, refresh]);
+
   return {
     data,
     forecast,
     budgetAverages,
     budgetAllocations,
+    plan,
+    projection,
+    meta,
     loading,
     error,
     refresh,
@@ -173,5 +209,7 @@ export function useFinance(month) {
     delManual,
     saveForecast,
     deleteForecast,
+    generatePlan,
+    loadProjection,
   };
 }

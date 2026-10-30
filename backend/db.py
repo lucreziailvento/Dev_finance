@@ -23,7 +23,9 @@ except ImportError:  # pragma: no cover - dipende dall'ambiente
     HAS_PSYCOPG2 = False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "portfolio_v2.db")
+# `DEVFINANCE_DB_PATH` permette di lavorare su una copia (test, backup, demo)
+# senza toccare il database reale.
+DB_PATH = os.environ.get("DEVFINANCE_DB_PATH") or os.path.join(BASE_DIR, "portfolio_v2.db")
 DATABASE_URL = os.environ.get("DATABASE_URL", "")
 USE_PG = HAS_PSYCOPG2 and bool(DATABASE_URL)
 
@@ -130,6 +132,14 @@ def init_db():
             planned_amount NUMERIC DEFAULT 0,
             PRIMARY KEY (month, micro_category)
         );
+        CREATE TABLE IF NOT EXISTS category_rules (
+            id SERIAL PRIMARY KEY,
+            pattern TEXT NOT NULL,
+            micro_category TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT '',
+            created_at TEXT,
+            UNIQUE (pattern, source)
+        );
         CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (date);
         CREATE INDEX IF NOT EXISTS idx_transactions_macro ON transactions (macro_category);
         CREATE INDEX IF NOT EXISTS idx_manual_records_date ON manual_records (date);
@@ -157,6 +167,14 @@ def init_db():
             micro_category TEXT NOT NULL,
             planned_amount REAL DEFAULT 0,
             PRIMARY KEY (month, micro_category)
+        );
+        CREATE TABLE IF NOT EXISTS category_rules (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pattern TEXT NOT NULL,
+            micro_category TEXT NOT NULL,
+            source TEXT NOT NULL DEFAULT '',
+            created_at TEXT,
+            UNIQUE (pattern, source)
         );
         CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (date);
         CREATE INDEX IF NOT EXISTS idx_transactions_macro ON transactions (macro_category);

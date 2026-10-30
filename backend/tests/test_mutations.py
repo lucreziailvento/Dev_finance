@@ -1,28 +1,11 @@
 """Test dei percorsi di scrittura su una copia temporanea del database.
 
-Nessun test tocca `backend/portfolio_v2.db`: `DB_PATH` viene sostituito con
-una copia in `tmp_path` prima di ogni test.
-"""
+Nessun test tocca `backend/portfolio_v2.db`: la fixture `isolated_db`
+(definita in `conftest.py`) prepara una copia in `tmp_path`."""
 
-import shutil
-from pathlib import Path
-
-import pytest
 from fastapi.testclient import TestClient
 
-import backend.db as db
 from backend.app import app
-
-
-@pytest.fixture()
-def isolated_db(tmp_path, monkeypatch):
-    source = Path(db.DB_PATH)
-    if not source.exists():
-        pytest.skip("database locale non disponibile")
-    target = tmp_path / "portfolio_test.db"
-    shutil.copy2(source, target)
-    monkeypatch.setattr(db, "DB_PATH", str(target))
-    return target
 
 
 def test_manual_record_crud(isolated_db):

@@ -7,6 +7,8 @@ from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from ..db import db_cursor, execute, insert_on_conflict
 from ..parser import esegui_etl_storico
+from ..app_common import get_macro
+from ..services.rules import get_rules, match_rule
 
 router = APIRouter()
 
@@ -44,9 +46,19 @@ async def ingest(
         )
 
         added = 0
+        # Le regole apprese hanno la precedenza sul classificatore statico.
+        rules = get_rules()
+
         # Un'unica transazione: o si importa tutto il file, o niente.
         with db_cursor(commit=True) as cursor:
             for _, row in df_clean.iterrows():
+                micro_category = row['micro_category']
+                macro_category = row['macro_category']
+                rule = match_rule(row['description'], row['source'], rules)
+                if rule is not None:
+                    micro_category = rule['micro_category']
+                    macro_category = get_macro(micro_category)
+
                 result = execute(
                     cursor,
                     sql,
@@ -55,8 +67,8 @@ async def ingest(
                         row['description'],
                         float(row['amount']),
                         row['source'],
-                        row['macro_category'],
-                        row['micro_category'],
+                        macro_category,
+                        micro_category,
                         row['hash_id'],
                     ),
                 )

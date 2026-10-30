@@ -57,6 +57,13 @@ export const api = {
   dashboard: (month) => request(`/api/dashboard/${month}`),
   trend: (months = 12) => request(`/api/trend?months=${months}`),
   stats: () => request('/api/stats'),
+  meta: () => request('/api/meta'),
+  transactions: (params = {}) => {
+    const query = new URLSearchParams(
+      Object.entries(params).filter(([, value]) => value !== '' && value !== undefined && value !== null),
+    ).toString();
+    return request(`/api/transactions${query ? `?${query}` : ''}`);
+  },
 
   forecast: (month) => request(`/api/forecast/${month}`),
   saveForecast: (entry) => sendJson('POST', '/api/forecast', entry),
@@ -67,6 +74,18 @@ export const api = {
   saveAllocations: (month, allocations) => sendJson('PUT', `/api/budget-allocations/${month}`, allocations),
 
   etfPlan: (months = 12, buffer = 0.2) => request(`/api/etf-plan?months=${months}&buffer=${buffer}`),
+
+  plan: (month) => request(`/api/plan/${month}`),
+  generatePlan: (month) => sendJson('POST', `/api/plan/${month}/generate`),
+  projection: (months = 6, buffer = 0) =>
+    request(`/api/projection?months=${months}&buffer=${buffer}`),
+
+  rules: () => request('/api/rules'),
+  createRule: (payload) => sendJson('POST', '/api/rules', payload),
+  deleteRule: (id) => request(`/api/rules/${id}`, { method: 'DELETE' }),
+  ruleFromTransaction: (payload) => sendJson('POST', '/api/rules/from-transaction', payload),
+
+  exportTransactionsUrl: () => `${apiBase()}/api/export/transactions.csv`,
 
   ingest: (fineco, revolut) => {
     const form = new FormData();

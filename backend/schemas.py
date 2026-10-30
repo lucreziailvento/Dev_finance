@@ -29,3 +29,16 @@ class ManualRecord(BaseModel):
     amount: float
     micro_category: str
     type: str
+
+
+class RuleCreate(BaseModel):
+    pattern: str
+    micro_category: str
+    source: str = ''
+    apply_existing: bool = False
+
+
+class RuleFromTransaction(BaseModel):
+    hash_id: str
+    micro_category: str = ''
+    apply_existing: bool = False

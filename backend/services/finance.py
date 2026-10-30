@@ -8,6 +8,18 @@ def median(arr):
     return (s[n // 2 - 1] + s[n // 2]) / 2
 
 
+def to_float(value):
+    """Normalizza float (SQLite) e Decimal (Postgres) in un float."""
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def round2(value):
+    return round(to_float(value), 2)
+
+
 def build_clean_monthly_series(rows):
     """Rows: list of dict(date, amount, description, macro_category, micro_category).
     Ritorna lista ordinata di dict:
@@ -26,7 +38,7 @@ def build_clean_monthly_series(rows):
         if not month:
             continue
         desc_lower = (r.get("description") or "").lower()
-        amount = float(r.get("amount") or 0)
+        amount = to_float(r.get("amount"))
         macro = r.get("macro_category") or ""
 
         is_compravendita = "compravendita" in desc_lower

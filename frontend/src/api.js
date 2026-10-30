@@ -1,53 +1,92 @@
 export function apiBase() {
-  return localStorage.getItem('devfinance_api_url') || window.location.origin;
+  try {
+    return localStorage.getItem('devfinance_api_url') || window.location.origin;
+  } catch {
+    return window.location.origin;
+  }
 }
 
-async function jfetch(path, options) {
-  const r = await fetch(`${apiBase()}${path}`, options);
-  return r.json();
+export class ApiError extends Error {
+  constructor(message, status = 0, payload = null) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.payload = payload;
+  }
+}
+
+/**
+ * Unico punto di uscita verso il backend: controlla lo status HTTP e
+ * trasforma gli errori in eccezioni, così i componenti non devono
+ * ispezionare `{error: ...}` a mano.
+ */
+async function request(path, options = {}) {
+  let response;
+  try {
+    response = await fetch(`${apiBase()}${path}`, options);
+  } catch {
+    throw new ApiError('Backend non raggiungibile. Controlla la connessione.');
+  }
+
+  const raw = await response.text();
+  let payload = null;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch {
+      payload = raw;
+    }
+  }
+
+  if (!response.ok) {
+    const detail = payload && payload.detail ? payload.detail : `Errore ${response.status}`;
+    throw new ApiError(typeof detail === 'string' ? detail : JSON.stringify(detail), response.status, payload);
+  }
+  return payload;
+}
+
+function sendJson(method, path, body) {
+  return request(path, {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export const api = {
-  dashboard: (month) => jfetch(`/api/dashboard/${month}`),
-  trend: (months = 12) => jfetch(`/api/trend?months=${months}`),
-  stats: () => jfetch('/api/stats'),
+  dashboard: (month) => request(`/api/dashboard/${month}`),
+  trend: (months = 12) => request(`/api/trend?months=${months}`),
+  stats: () => request('/api/stats'),
 
-  forecast: (month) => jfetch(`/api/forecast/${month}`),
-  saveForecast: (entry) => jfetch('/api/forecast', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(entry),
-  }),
-  deleteForecast: (date) => jfetch(`/api/forecast/${date}`, { method: 'DELETE' }),
+  forecast: (month) => request(`/api/forecast/${month}`),
+  saveForecast: (entry) => sendJson('POST', '/api/forecast', entry),
+  deleteForecast: (date) => request(`/api/forecast/${date}`, { method: 'DELETE' }),
 
-  budgetAverages: () => jfetch('/api/budget-averages'),
-  budgetAllocations: (month) => jfetch(`/api/budget-allocations/${month}`),
-  saveAllocations: (month, allocations) => jfetch(`/api/budget-allocations/${month}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(allocations),
-  }),
+  budgetAverages: () => request('/api/budget-averages'),
+  budgetAllocations: (month) => request(`/api/budget-allocations/${month}`),
+  saveAllocations: (month, allocations) => sendJson('PUT', `/api/budget-allocations/${month}`, allocations),
 
-  etfPlan: (months = 12, buffer = 0.2) => jfetch(`/api/etf-plan?months=${months}&buffer=${buffer}`),
+  etfPlan: (months = 12, buffer = 0.2) => request(`/api/etf-plan?months=${months}&buffer=${buffer}`),
 
-  ingest: async (fineco, revolut) => {
-    const fd = new FormData();
-    fd.append('fineco_file', fineco);
-    fd.append('revolut_file', revolut);
-    const r = await fetch(`${apiBase()}/api/ingest`, { method: 'POST', body: fd });
-    return r.json();
+  ingest: (fineco, revolut) => {
+    const form = new FormData();
+    if (fineco) form.append('fineco_file', fineco);
+    if (revolut) form.append('revolut_file', revolut);
+    return request('/api/ingest', { method: 'POST', body: form });
   },
 
-  addManual: (payload) => jfetch('/api/manual-records', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-  }),
-  updateManual: (id, payload) => jfetch(`/api/manual-records/${id}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-  }),
-  deleteManual: (id) => jfetch(`/api/manual-records/${id}`, { method: 'DELETE' }),
+  addManual: (payload) => sendJson('POST', '/api/manual-records', payload),
+  updateManual: (id, payload) => sendJson('PUT', `/api/manual-records/${id}`, payload),
+  deleteManual: (id) => request(`/api/manual-records/${id}`, { method: 'DELETE' }),
 
-  updateDescription: (hashId, newDescription) => jfetch('/api/transactions/update-description', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ hash_id: hashId, new_description: newDescription }),
-  }),
-  updateCategory: (hashId, newMicroCategory) => jfetch('/api/transactions/update-category', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ hash_id: hashId, new_micro_category: newMicroCategory }),
-  }),
+  updateDescription: (hashId, newDescription) =>
+    sendJson('POST', '/api/transactions/update-description', {
+      hash_id: hashId,
+      new_description: newDescription,
+    }),
+  updateCategory: (hashId, newMicroCategory) =>
+    sendJson('POST', '/api/transactions/update-category', {
+      hash_id: hashId,
+      new_micro_category: newMicroCategory,
+    }),
 };

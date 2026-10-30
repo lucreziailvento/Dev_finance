@@ -1,121 +1,114 @@
 from fastapi import APIRouter, Query
 
-from ..db import get_conn_and_cursor, commit_and_close, execute
+from ..db import ALL_TRANSACTIONS, db_cursor, execute
+from ..services.finance import round2
 
 router = APIRouter()
 
 
 @router.get("/api/trend")
 def trend(months: int = Query(default=24, ge=1, le=60)):
-    conn, c = get_conn_and_cursor()
-    execute(c, """
-        SELECT SUBSTR(date, 1, 7) as mo,
-               SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as income,
-               SUM(CASE WHEN amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti') THEN ABS(amount) ELSE 0 END) as expenses,
-               SUM(CASE WHEN macro_category = 'Investimenti' THEN ABS(amount) ELSE 0 END) as invested
-        FROM (
-            SELECT date, amount, macro_category FROM transactions
-            UNION ALL
-            SELECT date, amount, macro_category FROM manual_records
-        )
+    sql = f"""
+        SELECT SUBSTR(date, 1, 7) AS mo,
+               SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
+               SUM(CASE WHEN amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
+                        THEN ABS(amount) ELSE 0 END) AS expenses,
+               SUM(CASE WHEN macro_category = 'Investimenti' THEN ABS(amount) ELSE 0 END) AS invested
+        FROM {ALL_TRANSACTIONS} AS all_transactions
         WHERE date IS NOT NULL AND date != ''
-        GROUP BY mo ORDER BY mo DESC
+        GROUP BY mo
+        ORDER BY mo DESC
         LIMIT %s
-    """, (months,))
-    rows = [dict(r) for r in c.fetchall()]
-    commit_and_close(conn)
+    """
+    with db_cursor() as cursor:
+        rows = [dict(row) for row in execute(cursor, sql, (months,)).fetchall()]
+
     series = []
-    for r in reversed(rows):
-        income = round(float(r["income"]), 2)
-        expenses = round(float(r["expenses"]), 2)
-        invested = round(float(r["invested"]), 2)
+    for row in reversed(rows):
+        income = round2(row["income"])
+        expenses = round2(row["expenses"])
         series.append({
-            "month": r["mo"],
+            "month": row["mo"],
             "income": income,
             "expenses": expenses,
-            "invested": invested,
-            "savings": round(income - expenses, 2),
+            "invested": round2(row["invested"]),
+            "savings": round2(income - expenses),
         })
     return {"series": series}
 
 
 @router.get("/api/stats")
 def stats():
-    conn, c = get_conn_and_cursor()
-    execute(c, """
-        SELECT SUBSTR(date, 1, 7) as mo, SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) as income,
-               SUM(CASE WHEN amount < 0 AND macro_category NOT IN ('Trasferimento Interno','Investimenti') THEN ABS(amount) ELSE 0 END) as expenses,
-               SUM(CASE WHEN macro_category = 'Investimenti' THEN ABS(amount) ELSE 0 END) as invested,
-               SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) as total_out
-        FROM (
-            SELECT date, amount, macro_category FROM transactions
-            UNION ALL
-            SELECT date, amount, macro_category FROM manual_records
-        )
+    monthly_sql = f"""
+        SELECT SUBSTR(date, 1, 7) AS mo,
+               SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END) AS income,
+               SUM(CASE WHEN amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
+                        THEN ABS(amount) ELSE 0 END) AS expenses,
+               SUM(CASE WHEN macro_category = 'Investimenti' THEN ABS(amount) ELSE 0 END) AS invested,
+               SUM(CASE WHEN amount < 0 THEN ABS(amount) ELSE 0 END) AS total_out
+        FROM {ALL_TRANSACTIONS} AS all_transactions
         WHERE date IS NOT NULL AND date != ''
-        GROUP BY mo ORDER BY mo
-    """)
-    monthly = [dict(r) for r in c.fetchall()]
-
-    execute(c, """
-        SELECT SUBSTR(date, 1, 7) as mo, micro_category,
-               SUM(ABS(amount)) as tot
-        FROM (
-            SELECT date, amount, micro_category FROM transactions
-            WHERE amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
-            UNION ALL
-            SELECT date, amount, micro_category FROM manual_records
-            WHERE amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
-        )
+        GROUP BY mo
+        ORDER BY mo
+    """
+    category_sql = f"""
+        SELECT SUBSTR(date, 1, 7) AS mo, micro_category, SUM(ABS(amount)) AS tot
+        FROM {ALL_TRANSACTIONS} AS all_transactions
         WHERE date IS NOT NULL AND date != ''
-        GROUP BY mo, micro_category ORDER BY mo, tot DESC
-    """)
-    cat_rows = [dict(r) for r in c.fetchall()]
-
-    execute(c, """
-        SELECT SUBSTR(date, 1, 7) as mo, source,
-               COUNT(*) as cnt, SUM(ABS(amount)) as tot
-        FROM (
-            SELECT date, amount, source FROM transactions
-            UNION ALL
-            SELECT date, amount, 'Manuale' as source FROM manual_records
-        )
+          AND amount < 0
+          AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
+        GROUP BY mo, micro_category
+        ORDER BY mo, tot DESC
+    """
+    source_sql = f"""
+        SELECT SUBSTR(date, 1, 7) AS mo, source, COUNT(*) AS cnt, SUM(ABS(amount)) AS tot
+        FROM {ALL_TRANSACTIONS} AS all_transactions
         WHERE date IS NOT NULL AND date != ''
-        GROUP BY mo, source ORDER BY mo
-    """)
-    source_rows = [dict(r) for r in c.fetchall()]
-
-    execute(c, """
-        SELECT description, COUNT(*) as cnt, SUM(ABS(amount)) as tot
-        FROM (
-            SELECT description, amount FROM transactions
-            UNION ALL
-            SELECT description, amount FROM manual_records
-        )
+        GROUP BY mo, source
+        ORDER BY mo
+    """
+    description_sql = f"""
+        SELECT description, COUNT(*) AS cnt, SUM(ABS(amount)) AS tot
+        FROM {ALL_TRANSACTIONS} AS all_transactions
         WHERE amount < 0
-        GROUP BY description ORDER BY tot DESC LIMIT 15
-    """)
-    top_desc = [dict(r) for r in c.fetchall()]
+        GROUP BY description
+        ORDER BY tot DESC
+        LIMIT 15
+    """
 
-    commit_and_close(conn)
+    with db_cursor() as cursor:
+        monthly = [dict(row) for row in execute(cursor, monthly_sql).fetchall()]
+        category_rows = [dict(row) for row in execute(cursor, category_sql).fetchall()]
+        source_rows = [dict(row) for row in execute(cursor, source_sql).fetchall()]
+        top_rows = [dict(row) for row in execute(cursor, description_sql).fetchall()]
 
-    cat_per_month = {}
-    for r in cat_rows:
-        cat_per_month.setdefault(r["mo"], []).append({"name": r["micro_category"], "amount": round(float(r["tot"]), 2)})
+    categories_per_month = {}
+    for row in category_rows:
+        categories_per_month.setdefault(row["mo"], []).append(
+            {"name": row["micro_category"], "amount": round2(row["tot"])}
+        )
 
-    source_per_month = {}
-    for r in source_rows:
-        source_per_month.setdefault(r["mo"], []).append({"source": r["source"], "count": r["cnt"], "amount": round(float(r["tot"]), 2)})
-
-    for m in monthly:
-        m["income"] = round(float(m["income"]), 2)
-        m["expenses"] = round(float(m["expenses"]), 2)
-        m["invested"] = round(float(m["invested"]), 2)
-        m["total_out"] = round(float(m["total_out"]), 2)
+    sources_per_month = {}
+    for row in source_rows:
+        sources_per_month.setdefault(row["mo"], []).append(
+            {"source": row["source"], "count": row["cnt"], "amount": round2(row["tot"])}
+        )
 
     return {
-        "monthly": monthly,
-        "categories_per_month": cat_per_month,
-        "sources_per_month": source_per_month,
-        "top_descriptions": [{"description": r["description"], "count": r["cnt"], "total": round(float(r["tot"]), 2)} for r in top_desc],
+        "monthly": [
+            {
+                "mo": row["mo"],
+                "income": round2(row["income"]),
+                "expenses": round2(row["expenses"]),
+                "invested": round2(row["invested"]),
+                "total_out": round2(row["total_out"]),
+            }
+            for row in monthly
+        ],
+        "categories_per_month": categories_per_month,
+        "sources_per_month": sources_per_month,
+        "top_descriptions": [
+            {"description": row["description"], "count": row["cnt"], "total": round2(row["tot"])}
+            for row in top_rows
+        ],
     }

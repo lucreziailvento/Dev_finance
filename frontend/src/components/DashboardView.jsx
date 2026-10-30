@@ -1,7 +1,8 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { api } from '../api';
-import { MONTH_LABELS, COLORS, CATEGORIES } from '../constants';
+import { COLORS, monthLabel } from '../constants';
+import TransactionRow from './TransactionRow';
 
 const fmt = (v) => new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v || 0);
 
@@ -17,129 +18,51 @@ function MetricCard({ label, value, icon, color, gradient }) {
   );
 }
 
-function InlineEdit({ value, onSave, className }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value);
-  const ref = useRef(null);
-
-  useEffect(() => { if (editing && ref.current) ref.current.focus(); }, [editing]);
-
-  const commit = () => {
-    setEditing(false);
-    if (draft !== value && draft.trim()) onSave(draft.trim());
-    else setDraft(value);
-  };
-
-  if (editing) {
-    return (
-      <input ref={ref} value={draft} onChange={e => setDraft(e.target.value)}
-        onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(value); setEditing(false); } }}
-        className={`bg-slate-800 border border-cyan-500 rounded-lg px-2 py-0.5 text-sm text-slate-100 focus:outline-none ${className}`} />
-    );
-  }
-  return (
-    <button onClick={() => { setDraft(value); setEditing(true); }} className={`text-left hover:bg-white/5 rounded-lg px-2 py-0.5 transition-colors ${className}`}>
-      {value}
-    </button>
-  );
-}
-
-function InlineAmount({ amount, isManual, onSave, className }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(String(Math.abs(amount)));
-  const ref = useRef(null);
-
-  useEffect(() => { if (editing && ref.current) { ref.current.focus(); ref.current.select(); } }, [editing]);
-
-  const commit = () => {
-    setEditing(false);
-    const val = parseFloat(draft);
-    if (!isNaN(val) && val > 0 && val !== Math.abs(amount)) onSave(val);
-    else setDraft(String(Math.abs(amount)));
-  };
-
-  if (!isManual) {
-    return <span className={`font-mono ${className}`}>{fmt(amount)}</span>;
-  }
-
-  if (editing) {
-    return (
-      <input ref={ref} type="number" step="0.01" value={draft} onChange={e => setDraft(e.target.value)}
-        onBlur={commit} onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') { setDraft(String(Math.abs(amount))); setEditing(false); } }}
-        className={`w-24 bg-slate-800 border border-cyan-500 rounded-lg px-2 py-0.5 text-sm text-right font-mono text-slate-100 focus:outline-none ${className}`} />
-    );
-  }
-
-  return (
-    <button onClick={() => { setDraft(String(Math.abs(amount))); setEditing(true); }}
-      className={`font-mono hover:bg-white/5 rounded-lg px-1 transition-colors cursor-pointer ${className}`}>
-      {fmt(amount)}
-    </button>
-  );
-}
-
-function CategorySelect({ value, onChange, className }) {
-  const [open, setOpen] = useState(false);
-
-  return (
-    <div className="relative">
-      <button onClick={() => setOpen(!open)} className={`text-xs hover:bg-white/5 rounded-lg px-2 py-0.5 transition-colors ${className}`}>
-        {value}
-      </button>
-      {open && (
-        <>
-          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute bottom-full left-0 mb-1 z-20 bg-slate-800 border border-slate-600 rounded-xl shadow-xl max-h-48 overflow-y-auto min-w-[200px] py-1">
-            {CATEGORIES.map(cat => (
-              <button key={cat} onClick={() => { onChange(cat); setOpen(false); }}
-                className={`w-full text-left px-3 py-2 text-sm hover:bg-white/10 transition-colors ${cat === value ? 'text-cyan-400 font-bold' : 'text-slate-300'}`}>
-                {cat}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
-export default function DashboardView({ data, categories, transactions, catColor, onSelectCategory, selectedCategory, onOpenLedger, onUpdateDescription, onUpdateCategory, onUpdateAmount }) {
+export default function DashboardView({
+  data,
+  categories,
+  transactions,
+  catColor,
+  onSelectCategory,
+  selectedCategory,
+  onOpenLedger,
+  onUpdateDescription,
+  onUpdateCategory,
+  onUpdateAmount,
+}) {
   const [trend, setTrend] = useState([]);
 
   useEffect(() => {
-    api.trend(12).then(j => { if (j.series) setTrend(j.series); }).catch(() => {});
+    let active = true;
+    api.trend(12)
+      .then((payload) => { if (active && payload?.series) setTrend(payload.series); })
+      .catch(() => {});
+    return () => { active = false; };
   }, []);
 
-  const d = data || {};
-  const income = d.income ?? 0;
-  const expenses = d.expenses ?? 0;
-  const savings = d.savings ?? 0;
-  const invested = d.invested ?? 0;
-  const investable = d.investable ?? 0;
+  const income = data?.income ?? 0;
+  const expenses = data?.expenses ?? 0;
+  const savings = data?.savings ?? 0;
+  const invested = data?.invested ?? 0;
+  const investable = data?.investable ?? 0;
 
-  const chartData = trend.map(m => ({
-    label: MONTH_LABELS[m.month] || m.month,
-    Entrate: m.income,
-    Uscite: m.expenses,
+  const chartData = trend.map((row) => ({
+    label: monthLabel(row.month),
+    Entrate: row.income,
+    Uscite: row.expenses,
   }));
 
-  const totalExpenses = categories.reduce((s, c) => s + c.amount, 0);
+  const totalExpenses = categories.reduce((sum, category) => sum + category.amount, 0);
 
-  const renderTx = (t, i) => {
-    const isExpense = t.amount < 0;
-    const dotColor = isExpense ? COLORS.expenses : t.macro_category === 'Trasferimento Interno' ? COLORS.transfers : t.macro_category === 'Investimenti' ? COLORS.invested : COLORS.income;
-    return (
-      <div key={t.hash_id || i} className="flex items-center gap-3 py-2.5 px-1 rounded-xl hover:bg-white/5 transition-colors">
-        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: dotColor }} />
-        <div className="flex-1 min-w-0">
-          <InlineEdit value={t.description} onSave={v => onUpdateDescription(t, v)} className="text-sm text-slate-200 truncate block w-full" />
-          <CategorySelect value={t.micro_category} onChange={v => onUpdateCategory(t, v)} className="text-xs text-slate-500" />
-        </div>
-        <InlineAmount amount={t.amount} isManual={t.hash_id?.startsWith('manual_')} onSave={v => onUpdateAmount(t, v)}
-          className={`text-sm font-bold ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`} />
-      </div>
-    );
-  };
+  const renderTx = (tx, index) => (
+    <TransactionRow
+      key={tx.hash_id || index}
+      tx={tx}
+      onUpdateDescription={onUpdateDescription}
+      onUpdateCategory={onUpdateCategory}
+      onUpdateAmount={onUpdateAmount}
+    />
+  );
 
   return (
     <div className="space-y-5">
@@ -193,22 +116,22 @@ export default function DashboardView({ data, categories, transactions, catColor
           <p className="text-slate-600 text-sm text-center py-8">Nessuna spesa questo mese</p>
         ) : (
           <div className="space-y-3">
-            {categories.map(c => {
-              const pct = totalExpenses > 0 ? (c.amount / totalExpenses) * 100 : 0;
-              const isSelected = selectedCategory === c.name;
+            {categories.map((category) => {
+              const pct = totalExpenses > 0 ? (category.amount / totalExpenses) * 100 : 0;
+              const isSelected = selectedCategory === category.name;
               return (
-                <button key={c.name}
-                  onClick={() => onSelectCategory(isSelected ? null : c.name)}
+                <button key={category.name}
+                  onClick={() => onSelectCategory(isSelected ? null : category.name)}
                   className={`w-full text-left rounded-xl p-3 transition-all ${isSelected ? 'bg-white/5 ring-1 ring-white/10' : 'hover:bg-white/5'}`}>
                   <div className="flex items-center justify-between mb-1.5">
                     <div className="flex items-center gap-2.5">
-                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: catColor(c.name) }} />
-                      <span className="text-sm text-slate-300">{c.name}</span>
+                      <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: catColor(category.name) }} />
+                      <span className="text-sm text-slate-300">{category.name}</span>
                     </div>
-                    <span className="text-sm font-bold text-slate-200 font-mono">{fmt(c.amount)}</span>
+                    <span className="text-sm font-bold text-slate-200 font-mono">{fmt(category.amount)}</span>
                   </div>
                   <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: catColor(c.name) }} />
+                    <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: catColor(category.name) }} />
                   </div>
                   <span className="text-[11px] text-slate-500 mt-1 block">{pct.toFixed(0)}% del totale</span>
                 </button>
@@ -223,7 +146,7 @@ export default function DashboardView({ data, categories, transactions, catColor
           <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Ultime transazioni</h3>
           <button onClick={onOpenLedger} className="text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors">Vedi tutte →</button>
         </div>
-        {(!transactions || transactions.length === 0) ? (
+        {!transactions || transactions.length === 0 ? (
           <p className="text-slate-600 text-sm text-center py-6">Nessuna transazione</p>
         ) : (
           <div className="space-y-1">

@@ -38,7 +38,7 @@ const MONTH_FULL_IT = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giug
 export const MONTH_LABELS = {};
 export const MONTH_FULL = {};
 
-for (let y = 2024; y <= 2027; y++) {
+for (let y = 2020; y <= 2035; y++) {
   for (let m = 1; m <= 12; m++) {
     const key = `${y}-${String(m).padStart(2, '0')}`;
     MONTH_LABELS[key] = MONTH_IT[m - 1];
@@ -47,6 +47,22 @@ for (let y = 2024; y <= 2027; y++) {
 }
 
 export const MONTHS = Object.keys(MONTH_LABELS).sort();
+
+/** Etichetta leggibile anche per mesi fuori dall'intervallo precalcolato. */
+export function monthFull(key) {
+  if (!key) return '';
+  if (MONTH_FULL[key]) return MONTH_FULL[key];
+  const [year, month] = key.split('-').map(Number);
+  if (!year || !month || month < 1 || month > 12) return key;
+  return `${MONTH_FULL_IT[month - 1]} ${year}`;
+}
+
+export function monthLabel(key) {
+  if (!key) return '';
+  if (MONTH_LABELS[key]) return MONTH_LABELS[key];
+  const month = Number(key.split('-')[1]);
+  return MONTH_IT[month - 1] || key;
+}
 
 export const COLORS = {
   income: '#10b981',

@@ -2,6 +2,8 @@ import pandas as pd
 import re
 import hashlib
 
+from .app_common import get_macro
+
 CATEGORY_MAP = {
     "Spesa Alimentare": [r"esselunga", r"coop", r"conad", r"lidl", r"carrefour", r"supermercati", r"aldi", r"pam", r"eataly", r"just eat"],
     "Aperitivi": [r"aperitivo", r"spritz", r"cocktail", r"happy hour", r"negroni", r"prosecco bar", r"aperol"],
@@ -52,14 +54,8 @@ def categorizza(descrizione, importo):
     for micro, patterns in CATEGORY_MAP.items():
         for pattern in patterns:
             if re.search(pattern, desc_lower):
-                if micro == "Entrate_Lavoro":
-                    return "Entrate", micro
-                elif micro == "Investimenti & Risparmio":
-                    return "Investimenti", micro
-                elif micro in ["Svago & Ristorazione", "Shopping & Lifestyle", "Trasporti & Viaggi", "Sport & Salute", "Aperitivi", "Regali", "Casa & Arredamento", "Colazioni", "Vacanza", "Weekend Fuori"]:
-                    return "Spese Variabili", micro
-                else:
-                    return "Spese Fisse", micro
+                # La mappa macro vive in un solo posto: app_common.py
+                return get_macro(micro), micro
 
     if importo > 0:
         return "Entrate", "Altre Entrate"
@@ -96,10 +92,13 @@ def pulisci_importo(valore):
 
 
 def normalizza_banca_principale(file_path):
+    empty = pd.DataFrame(columns=['date', 'description', 'amount', 'source'])
+    if not file_path:
+        return empty
     try:
         df_grezzo = pd.read_excel(file_path, header=None)
     except Exception:
-        return pd.DataFrame(columns=['date', 'description', 'amount', 'source'])
+        return empty
 
     found_idx = None
     for idx, row in df_grezzo.iterrows():
@@ -164,6 +163,9 @@ def normalizza_banca_principale(file_path):
 
 
 def normalizza_revolut(file_path):
+    empty = pd.DataFrame(columns=['date', 'description', 'amount', 'source'])
+    if not file_path:
+        return empty
     try:
         df = pd.read_csv(file_path, dtype=str)
         if 'Prodotto' in df.columns:

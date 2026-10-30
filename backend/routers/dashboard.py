@@ -1,82 +1,68 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
-from ..db import get_conn_and_cursor, commit_and_close, execute
+from ..db import ALL_TRANSACTIONS, db_cursor, execute
+from ..services.finance import round2
 
 router = APIRouter()
+
+# Una sola query invece di quattro: stessi totali, un quarto delle connessioni.
+TOTALS_SQL = f"""
+    SELECT
+        COALESCE(SUM(CASE WHEN macro_category = 'Entrate' THEN amount ELSE 0 END), 0) AS income,
+        COALESCE(SUM(CASE WHEN amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
+                          THEN ABS(amount) ELSE 0 END), 0) AS expenses,
+        COALESCE(SUM(CASE WHEN macro_category = 'Investimenti' THEN ABS(amount) ELSE 0 END), 0) AS invested,
+        COALESCE(SUM(CASE WHEN macro_category = 'Trasferimento Interno' THEN ABS(amount) ELSE 0 END), 0) AS transfers
+    FROM {ALL_TRANSACTIONS} AS all_transactions
+    WHERE SUBSTR(date, 1, 7) = %s
+"""
+
+CATEGORIES_SQL = f"""
+    SELECT micro_category, SUM(ABS(amount)) AS tot
+    FROM {ALL_TRANSACTIONS} AS all_transactions
+    WHERE SUBSTR(date, 1, 7) = %s
+      AND amount < 0
+      AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
+    GROUP BY micro_category
+    ORDER BY tot DESC
+"""
+
+TRANSACTIONS_SQL = f"""
+    SELECT date, description, amount, source, macro_category, micro_category, hash_id
+    FROM {ALL_TRANSACTIONS} AS all_transactions
+    WHERE SUBSTR(date, 1, 7) = %s
+    ORDER BY date DESC, hash_id DESC
+"""
 
 
 @router.get("/api/dashboard/{month}")
 def dashboard(month: str):
     try:
-        conn, c = get_conn_and_cursor()
-        execute(c, """
-            SELECT COALESCE(SUM(amount), 0) as val FROM (
-                SELECT amount FROM transactions WHERE SUBSTR(date, 1, 7) = %s AND macro_category = 'Entrate'
-                UNION ALL
-                SELECT amount FROM manual_records WHERE SUBSTR(date, 1, 7) = %s AND macro_category = 'Entrate'
-            )
-        """, (month, month))
-        income = round(c.fetchone()["val"], 2)
+        with db_cursor() as cursor:
+            totals = execute(cursor, TOTALS_SQL, (month,)).fetchone()
+            income = round2(totals["income"])
+            expenses = round2(totals["expenses"])
+            invested = round2(totals["invested"])
+            transfers = round2(totals["transfers"])
 
-        execute(c, """
-            SELECT COALESCE(SUM(ABS(amount)), 0) as val FROM (
-                SELECT amount FROM transactions
-                WHERE SUBSTR(date, 1, 7) = %s AND amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
-                UNION ALL
-                SELECT amount FROM manual_records
-                WHERE SUBSTR(date, 1, 7) = %s AND amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
-            )
-        """, (month, month))
-        expenses = round(c.fetchone()["val"], 2)
+            categories = [
+                {"name": row["micro_category"], "amount": round2(row["tot"])}
+                for row in execute(cursor, CATEGORIES_SQL, (month,)).fetchall()
+            ]
+            transactions = [
+                dict(row) for row in execute(cursor, TRANSACTIONS_SQL, (month,)).fetchall()
+            ]
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
-        execute(c, """
-            SELECT COALESCE(SUM(ABS(amount)), 0) as val FROM (
-                SELECT amount FROM transactions WHERE SUBSTR(date, 1, 7) = %s AND macro_category = 'Investimenti'
-                UNION ALL
-                SELECT amount FROM manual_records WHERE SUBSTR(date, 1, 7) = %s AND macro_category = 'Investimenti'
-            )
-        """, (month, month))
-        invested = round(c.fetchone()["val"], 2)
-
-        execute(c, """
-            SELECT COALESCE(SUM(ABS(amount)), 0) as val FROM (
-                SELECT amount FROM transactions WHERE SUBSTR(date, 1, 7) = %s AND macro_category = 'Trasferimento Interno'
-                UNION ALL
-                SELECT amount FROM manual_records WHERE SUBSTR(date, 1, 7) = %s AND macro_category = 'Trasferimento Interno'
-            )
-        """, (month, month))
-        transfers = round(c.fetchone()["val"], 2)
-
-        savings = round(income - expenses, 2)
-        investable = round(savings - invested, 2)
-
-        execute(c, """
-            SELECT micro_category, SUM(ABS(amount)) as tot FROM (
-                SELECT micro_category, amount FROM transactions
-                WHERE SUBSTR(date, 1, 7) = %s AND amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
-                UNION ALL
-                SELECT micro_category, amount FROM manual_records
-                WHERE SUBSTR(date, 1, 7) = %s AND amount < 0 AND macro_category NOT IN ('Trasferimento Interno', 'Investimenti')
-            ) GROUP BY micro_category ORDER BY tot DESC
-        """, (month, month))
-        categories = [{"name": r["micro_category"], "amount": round(r["tot"], 2)} for r in c.fetchall()]
-
-        execute(c, """
-            SELECT date, description, amount, source, macro_category, micro_category, hash_id FROM (
-                SELECT date, description, amount, source, macro_category, micro_category, hash_id
-                FROM transactions WHERE SUBSTR(date, 1, 7) = %s
-                UNION ALL
-                SELECT date, description, amount, 'Manuale' as source, macro_category, micro_category, 'manual_' || id as hash_id
-                FROM manual_records WHERE SUBSTR(date, 1, 7) = %s
-            ) ORDER BY date DESC, hash_id DESC
-        """, (month, month))
-        transactions = [dict(r) for r in c.fetchall()]
-
-        commit_and_close(conn)
-        return {
-            "income": income, "expenses": expenses, "savings": savings,
-            "invested": invested, "investable": investable, "transfers": transfers,
-            "categories": categories, "transactions": transactions,
-        }
-    except Exception as e:
-        return {"error": str(e)}
+    savings = round2(income - expenses)
+    return {
+        "income": income,
+        "expenses": expenses,
+        "savings": savings,
+        "invested": invested,
+        "investable": round2(savings - invested),
+        "transfers": transfers,
+        "categories": categories,
+        "transactions": transactions,
+    }

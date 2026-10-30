@@ -3,10 +3,13 @@
 __pycache__/
 node_modules/
 backend/data/
-.DS_Store
 *.db
 *.db-journal
 *.db-wal
 *.db-shm
 .vercel
 .env*
+.venv/
+venv/
+backups/
+.pytest_cache/

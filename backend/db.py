@@ -49,7 +49,14 @@ def fix_sql(sql):
 
 
 def execute(cursor, sql, params=None):
-    return cursor.execute(fix_sql(sql), tuple(params or ()))
+    """Esegue e **restituisce il cursore**.
+
+    `psycopg2.cursor.execute()` restituisce `None`, mentre `sqlite3` restituisce
+    il cursore: senza questo `return` i router funzionano in locale ma falliscono
+    su PostgreSQL con `'NoneType' object has no attribute 'fetchall'`.
+    """
+    cursor.execute(fix_sql(sql), tuple(params or ()))
+    return cursor
 
 
 def _new_connection():
@@ -182,15 +189,28 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_daily_forecast_date ON daily_forecast (date);
     """
     ddl = ddl_pg if USE_PG else ddl_sqlite
+    errors = []
     try:
         conn, cursor = _new_connection()
         for statement in ddl.split(';'):
             statement = statement.strip()
-            if statement:
+            if not statement:
+                continue
+            try:
                 cursor.execute(fix_sql(statement + ';'))
-        conn.commit()
+                conn.commit()
+            except Exception as exc:  # pragma: no cover - dipende dal database
+                conn.rollback()
+                message = str(exc).lower()
+                # Su Vercel più istanze partono insieme: la seconda trova
+                # tabelle e sequenze già create. Non è un errore.
+                if 'already exists' not in message and 'duplicate key' not in message:
+                    errors.append(str(exc))
         cursor.close()
         conn.close()
+        if errors:
+            print("init_db error: " + "; ".join(errors))
+            return False
         return True
     except Exception as exc:  # pragma: no cover - visibile nei log di avvio
         print(f"init_db error: {exc}")

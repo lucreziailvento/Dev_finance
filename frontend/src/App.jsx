@@ -46,6 +46,7 @@ export default function App() {
   const [ledgerRows, setLedgerRows] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState(null);
+  const [confirmState, setConfirmState] = useState(null);
 
   const finance = useFinance(month);
   const finecoRef = useRef(null);
@@ -57,6 +58,72 @@ export default function App() {
     setToast({ message, type });
     toastTimer.current = setTimeout(() => setToast(null), 3000);
   }, []);
+
+  const askConfirm = useCallback((options) => setConfirmState(options), []);
+
+  const fmtAmount = (value) => new Intl.NumberFormat('it-IT', {
+    style: 'currency',
+    currency: 'EUR',
+  }).format(value || 0);
+
+  const syncLedgerRow = (hashId, changes) => {
+    setLedgerRows((rows) => (
+      rows
+        ? rows.map((row) => (row.hash_id === hashId ? { ...row, ...changes } : row))
+        : rows
+    ));
+  };
+
+  const handleUpdateDescription = async (tx, value) => {
+    const result = await finance.updDesc(tx, value);
+    if (result.ok) syncLedgerRow(tx.hash_id, { description: value });
+    return result;
+  };
+
+  const handleUpdateCategory = async (tx, value) => {
+    const result = await finance.updCat(tx, value);
+    if (result.ok) syncLedgerRow(tx.hash_id, { micro_category: value });
+    return result;
+  };
+
+  const handleUpdateAmount = async (tx, value) => {
+    const result = await finance.updAmount(tx, value);
+    if (result.ok) syncLedgerRow(tx.hash_id, { amount: tx.amount < 0 ? -Math.abs(value) : Math.abs(value) });
+    return result;
+  };
+
+  const handleDeleteTransaction = (tx) => {
+    if (!tx?.hash_id) return;
+    askConfirm({
+      title: 'Elimina transazione',
+      message: `Vuoi eliminare definitivamente «${tx.description}» del ${tx.date} (${fmtAmount(tx.amount)})?`,
+      confirmLabel: 'Elimina',
+      danger: true,
+      onConfirm: async () => {
+        const result = await finance.delTransaction(tx);
+        if (!result.ok) {
+          showToast(result.error || 'Errore eliminazione', 'error');
+          return;
+        }
+        setLedgerRows((rows) => (
+          rows ? rows.filter((row) => row.hash_id !== tx.hash_id) : rows
+        ));
+        showToast('Transazione eliminata');
+      },
+    });
+  };
+
+  const handleDataChanged = async () => {
+    await finance.refresh(month);
+    if (ledgerRows) {
+      try {
+        const result = await api.transactions({ limit: 5000 });
+        setLedgerRows(result.transactions || []);
+      } catch {
+        // Il registro si riallinea al prossimo apertura.
+      }
+    }
+  };
 
   const transactions = finance.data?.transactions || [];
   const categories = finance.data?.categories || [];
@@ -276,9 +343,10 @@ export default function App() {
                 onSelectCategory={setSelectedCategory}
                 selectedCategory={selectedCategory}
                 onOpenLedger={openLedger}
-                onUpdateDescription={finance.updDesc}
-                onUpdateCategory={finance.updCat}
-                onUpdateAmount={finance.updAmount}
+                onUpdateDescription={handleUpdateDescription}
+                onUpdateCategory={handleUpdateCategory}
+                onUpdateAmount={handleUpdateAmount}
+                onDelete={handleDeleteTransaction}
               />
             )}
             {tab === 'plan' && (
@@ -417,6 +485,9 @@ export default function App() {
             {ledgerTransactions.length} transazioni
             {ledgerRows ? ' · tutto lo storico' : ''}
           </p>
+          <p className="text-[10px] text-slate-600">
+            Tocca descrizione, categoria o importo per modificare · ✕ per eliminare
+          </p>
 
           {ledgerTransactions.length === 0 ? (
             <p className="text-slate-600 text-sm text-center py-6">Nessuna transazione</p>
@@ -427,9 +498,10 @@ export default function App() {
                   key={tx.hash_id || index}
                   tx={tx}
                   showDate
-                  onUpdateDescription={finance.updDesc}
-                  onUpdateCategory={finance.updCat}
-                  onUpdateAmount={finance.updAmount}
+                  onUpdateDescription={handleUpdateDescription}
+                  onUpdateCategory={handleUpdateCategory}
+                  onUpdateAmount={handleUpdateAmount}
+                  onDelete={handleDeleteTransaction}
                   onMakeRule={handleMakeRule}
                 />
               ))}
@@ -451,7 +523,39 @@ export default function App() {
         open={showSettings}
         onClose={() => setShowSettings(false)}
         showToast={showToast}
+        askConfirm={askConfirm}
+        onDataChanged={handleDataChanged}
       />
+
+      <Modal
+        open={Boolean(confirmState)}
+        onClose={() => setConfirmState(null)}
+        title={confirmState?.title || 'Conferma'}
+      >
+        <p className="text-sm text-slate-300">{confirmState?.message}</p>
+        <div className="flex gap-2 mt-5">
+          <button
+            onClick={() => setConfirmState(null)}
+            className="flex-1 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 text-sm font-bold text-slate-300 transition-colors"
+          >
+            Annulla
+          </button>
+          <button
+            onClick={async () => {
+              const current = confirmState;
+              setConfirmState(null);
+              await current?.onConfirm?.();
+            }}
+            className={`flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-colors ${
+              confirmState?.danger
+                ? 'bg-rose-500 hover:bg-rose-400'
+                : 'bg-cyan-500 hover:bg-cyan-400'
+            }`}
+          >
+            {confirmState?.confirmLabel || 'Conferma'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

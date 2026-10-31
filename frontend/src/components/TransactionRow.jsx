@@ -14,6 +14,7 @@ export default function TransactionRow({
   onUpdateDescription,
   onUpdateCategory,
   onUpdateAmount,
+  onDelete = null,
   onMakeRule = null,
   showDate = false,
 }) {
@@ -41,7 +42,7 @@ export default function TransactionRow({
       <div className="text-right">
         <InlineAmount
           amount={tx.amount}
-          editable={isManual}
+          editable={Boolean(onUpdateAmount)}
           onSave={(value) => onUpdateAmount(tx, value)}
           className={`text-sm font-bold ${isExpense ? 'text-rose-400' : 'text-emerald-400'}`}
         />
@@ -55,6 +56,17 @@ export default function TransactionRow({
           className="w-7 h-7 flex-shrink-0 rounded-lg bg-white/5 hover:bg-cyan-500/20 text-xs text-slate-400 hover:text-cyan-300 transition-colors"
         >
           🔁
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(tx)}
+          title="Elimina transazione"
+          aria-label={`Elimina ${tx.description}`}
+          className="w-7 h-7 flex-shrink-0 rounded-lg bg-white/5 hover:bg-rose-500/20 text-xs text-slate-400 hover:text-rose-300 transition-colors"
+        >
+          ✕
         </button>
       )}
     </div>

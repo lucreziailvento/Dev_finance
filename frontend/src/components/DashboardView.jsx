@@ -29,6 +29,7 @@ export default function DashboardView({
   onUpdateDescription,
   onUpdateCategory,
   onUpdateAmount,
+  onDelete,
 }) {
   const [trend, setTrend] = useState([]);
 
@@ -61,6 +62,7 @@ export default function DashboardView({
       onUpdateDescription={onUpdateDescription}
       onUpdateCategory={onUpdateCategory}
       onUpdateAmount={onUpdateAmount}
+      onDelete={onDelete}
     />
   );
 

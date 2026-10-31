@@ -25,6 +25,7 @@ from backend.routers import (
     rules,
     export,
     meta,
+    imports,
 )
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -65,6 +66,7 @@ app.include_router(plan.router)
 app.include_router(rules.router)
 app.include_router(export.router)
 app.include_router(meta.router)
+app.include_router(imports.router)
 
 
 @app.get("/api/health")

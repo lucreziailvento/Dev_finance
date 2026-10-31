@@ -128,17 +128,19 @@ export function useFinance(month) {
 
   const updAmount = useCallback(
     (tx, value) => mutate(async () => {
-      if (!isManual(tx)) return;
-      await api.updateManual(manualId(tx), manualPayload(tx, { amount: value }));
+      if (isManual(tx)) await api.updateManual(manualId(tx), manualPayload(tx, { amount: value }));
+      else await api.updateAmount(tx.hash_id, value);
       await refresh(month);
     }),
     [month, mutate, refresh],
   );
 
-  const delManual = useCallback(
-    (hashId) => mutate(async () => {
-      if (!hashId?.startsWith('manual_')) return;
-      await api.deleteManual(hashId.replace('manual_', ''));
+  const delTransaction = useCallback(
+    (tx) => mutate(async () => {
+      const hashId = typeof tx === 'string' ? tx : tx?.hash_id;
+      if (!hashId) throw new Error('Transazione non valida');
+      if (hashId.startsWith('manual_')) await api.deleteManual(manualId({ hash_id: hashId }));
+      else await api.deleteTransaction(hashId);
       await refresh(month);
     }),
     [month, mutate, refresh],
@@ -206,7 +208,7 @@ export function useFinance(month) {
     updDesc,
     updCat,
     updAmount,
-    delManual,
+    delTransaction,
     saveForecast,
     deleteForecast,
     generatePlan,

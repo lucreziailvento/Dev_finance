@@ -11,6 +11,17 @@ class CategoryUpdate(BaseModel):
     new_micro_category: str
 
 
+class AmountUpdate(BaseModel):
+    hash_id: str
+    amount: float
+
+
+class TransactionDeleteFilter(BaseModel):
+    source: str = ''
+    date_from: str = ''
+    date_to: str = ''
+
+
 class ForecastEntry(BaseModel):
     date: str
     planned_income: float = 0

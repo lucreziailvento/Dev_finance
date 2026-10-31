@@ -114,6 +114,23 @@ def insert_on_conflict(table, columns, values, conflict_col):
     return f"INSERT OR IGNORE INTO {table} ({cols}) VALUES ({placeholders})"
 
 
+def insert_returning_id(cursor, sql, params=None):
+    """Esegue un INSERT e restituisce l'id generato, su entrambi i backend.
+
+    PostgreSQL usa `RETURNING id`, SQLite espone `lastrowid` sul cursore.
+    """
+    if USE_PG:
+        statement = sql.rstrip().rstrip(';')
+        if 'RETURNING' not in statement.upper():
+            statement = f"{statement} RETURNING id"
+        row = execute(cursor, statement, params).fetchone()
+        if row is None:
+            return None
+        return row['id'] if isinstance(row, dict) else row[0]
+    execute(cursor, sql, params)
+    return cursor.lastrowid
+
+
 def init_db():
     """Crea tabelle e indici se mancano. Non distrugge né migra dati esistenti."""
     ddl_pg = """
@@ -147,8 +164,22 @@ def init_db():
             created_at TEXT,
             UNIQUE (pattern, source)
         );
+        CREATE TABLE IF NOT EXISTS import_batches (
+            id SERIAL PRIMARY KEY,
+            filename TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '',
+            records_added INTEGER DEFAULT 0,
+            created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS import_batch_transactions (
+            batch_id INTEGER NOT NULL,
+            hash_id TEXT NOT NULL,
+            PRIMARY KEY (batch_id, hash_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_batch_transactions_hash ON import_batch_transactions (hash_id);
         CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (date);
         CREATE INDEX IF NOT EXISTS idx_transactions_macro ON transactions (macro_category);
+        CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions (source);
         CREATE INDEX IF NOT EXISTS idx_manual_records_date ON manual_records (date);
         CREATE INDEX IF NOT EXISTS idx_daily_forecast_date ON daily_forecast (date);
     """
@@ -183,8 +214,22 @@ def init_db():
             created_at TEXT,
             UNIQUE (pattern, source)
         );
+        CREATE TABLE IF NOT EXISTS import_batches (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT '',
+            records_added INTEGER DEFAULT 0,
+            created_at TEXT
+        );
+        CREATE TABLE IF NOT EXISTS import_batch_transactions (
+            batch_id INTEGER NOT NULL,
+            hash_id TEXT NOT NULL,
+            PRIMARY KEY (batch_id, hash_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_batch_transactions_hash ON import_batch_transactions (hash_id);
         CREATE INDEX IF NOT EXISTS idx_transactions_date ON transactions (date);
         CREATE INDEX IF NOT EXISTS idx_transactions_macro ON transactions (macro_category);
+        CREATE INDEX IF NOT EXISTS idx_transactions_source ON transactions (source);
         CREATE INDEX IF NOT EXISTS idx_manual_records_date ON manual_records (date);
         CREATE INDEX IF NOT EXISTS idx_daily_forecast_date ON daily_forecast (date);
     """

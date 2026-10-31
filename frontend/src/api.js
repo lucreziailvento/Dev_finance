@@ -108,4 +108,13 @@ export const api = {
       hash_id: hashId,
       new_micro_category: newMicroCategory,
     }),
+  updateAmount: (hashId, amount) =>
+    sendJson('POST', '/api/transactions/update-amount', { hash_id: hashId, amount }),
+  deleteTransaction: (hashId) =>
+    request(`/api/transactions/${encodeURIComponent(hashId)}`, { method: 'DELETE' }),
+  deleteRange: (payload) => sendJson('POST', '/api/transactions/delete-range', payload),
+  sources: () => request('/api/transactions/sources'),
+
+  imports: () => request('/api/imports'),
+  deleteImport: (id) => request(`/api/imports/${id}`, { method: 'DELETE' }),
 };

@@ -75,6 +75,7 @@ export default function SettingsModal({ open, onClose, showToast, askConfirm, on
       source: bulkSource,
       date_from: bulkFrom,
       date_to: bulkTo,
+      imported: true,
       limit: 1,
     })
       .then((result) => { if (active) setBulkCount(result?.total ?? 0); })

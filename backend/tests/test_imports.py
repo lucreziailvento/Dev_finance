@@ -162,3 +162,10 @@ def test_sources_endpoint(temp_db):
 
         filtered = client.get('/api/transactions', params={'source': 'Fineco'}).json()
         assert filtered['total'] == 2
+
+        # L'anteprima massiva conta solo le importate, non i movimenti manuali.
+        window = {'date_from': '2099-06-01', 'date_to': '2099-07-31'}
+        assert client.get('/api/transactions', params=window).json()['total'] == 4
+        imported_only = client.get('/api/transactions', params={**window, 'imported': True}).json()
+        assert imported_only['total'] == 3
+        assert all(row['hash_id'].startswith('s') for row in imported_only['transactions'])

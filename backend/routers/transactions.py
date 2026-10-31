@@ -17,6 +17,7 @@ def list_transactions(
     source: str = Query(default=""),
     date_from: str = Query(default=""),
     date_to: str = Query(default=""),
+    imported: bool = Query(default=False),
     limit: int = Query(default=500, ge=1, le=5000),
     offset: int = Query(default=0, ge=0),
 ):
@@ -47,18 +48,21 @@ def list_transactions(
         where.append("date <= %s")
         params.append(date_to)
     clause = " AND ".join(where)
+    # Con `imported=true` restano fuori i movimenti manuali: serve all'anteprima
+    # della cancellazione massiva, che agisce solo sulle transazioni importate.
+    origin = "transactions" if imported else f"{ALL_TRANSACTIONS} AS all_transactions"
 
     with db_cursor() as cursor:
         total = execute(
             cursor,
-            f"SELECT COUNT(*) AS cnt FROM {ALL_TRANSACTIONS} AS all_transactions WHERE {clause}",
+            f"SELECT COUNT(*) AS cnt FROM {origin} WHERE {clause}",
             params,
         ).fetchone()["cnt"]
         rows = execute(
             cursor,
             f"""
             SELECT date, description, amount, source, macro_category, micro_category, hash_id
-            FROM {ALL_TRANSACTIONS} AS all_transactions
+            FROM {origin}
             WHERE {clause}
             ORDER BY date DESC, hash_id
             LIMIT %s OFFSET %s
